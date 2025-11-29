@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check } from "lucide-react";
+import { Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import AudioVisualizer from "@/components/AudioVisualizer";
@@ -130,10 +130,13 @@ export default function Home() {
   const [inputValue, setInputValue] = useState("");
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [copied, setCopied] = useState(false);
+  const [blogDraft, setBlogDraft] = useState<{ title: string; markdown: string } | null>(null);
+  const [blogLoading, setBlogLoading] = useState(false);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef(inputValue);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
+  const [sttError, setSttError] = useState<string | null>(null);
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
@@ -251,50 +254,65 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
+  const setupRecognition = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "zh-CN";
-
-        recognition.onresult = (event: any) => {
-          let finalTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
-          }
-
-          if (finalTranscript) {
-            const newValue = inputRef.current + finalTranscript;
-            setInputValue(newValue);
-
-            // Reset silence timer
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = setTimeout(() => {
-              // Auto-send after 2 seconds of silence
-              if (inputRef.current.trim()) {
-                stopRecording();
-                // Trigger send
-                const content = inputRef.current;
-                setInputValue("");
-                sendMessage({ role: 'user', content } as any).catch(err => console.error("Auto-send failed:", err));
-              }
-            }, 2000);
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
-          setIsRecording(false);
-        };
-
-        recognitionRef.current = recognition;
+      if (!SpeechRecognition) {
+        setSttError('语音识别不可用：请使用 Chrome（桌面版），或确认浏览器支持 Web Speech API。');
+        return;
       }
+      if (!isSecure) {
+        setSttError('语音识别需要在 https 或 localhost 环境下运行，请切换到安全环境再试。');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'zh-CN';
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          const newValue = inputRef.current + finalTranscript;
+          setInputValue(newValue);
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            if (inputRef.current.trim()) {
+              stopRecording();
+              const content = inputRef.current;
+              setInputValue('');
+              sendMessage({ role: 'user', content } as any).catch(err => console.error('Auto-send failed:', err));
+            }
+          }, 2000);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        setSttError(`语音识别错误：${event.error}`);
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        setIsRecording(false);
+        try { recognition.stop(); } catch {}
+      };
+
+      recognitionRef.current = recognition;
+      setSttError(null);
+    } catch (e: any) {
+      console.error('setupRecognition failed', e);
+      setSttError(`语音识别初始化失败：${e?.message || e}`);
     }
+  };
+
+  useEffect(() => {
+    setupRecognition();
   }, [sendMessage]);
 
   const startRecording = async () => {
@@ -345,6 +363,31 @@ export default function Home() {
                 title="Copy last response"
               >
                 {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setBlogLoading(true);
+                    const res = await fetch('/api/blog', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ messages }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
+                    setBlogDraft({ title: data.title, markdown: data.markdown });
+                  } catch (e) {
+                    console.error('Blog generation failed', e);
+                    alert('生成博客失败，请重试');
+                  } finally {
+                    setBlogLoading(false);
+                  }
+                }}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white disabled:opacity-50"
+                title="生成博客"
+                disabled={blogLoading}
+              >
+                <FileText className="w-5 h-5" />
               </button>
               <button
                 onClick={clearChat}
@@ -403,8 +446,53 @@ export default function Home() {
         })}
       </div>
 
+      {/* Blog Preview Panel */}
+      {blogDraft && (
+        <div className="border-t border-white/10 bg-black/70 backdrop-blur-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-gray-300">
+              <FileText className="w-4 h-4" />
+              <span className="text-sm">博客草稿预览</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBlogDraft(null)}
+                className="px-2 py-1 text-xs rounded-md bg-white/10 hover:bg-white/15"
+              >关闭</button>
+              <button
+                onClick={() => {
+                  const blob = new Blob([blogDraft.markdown], { type: 'text/markdown;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  const safeTitle = (blogDraft.title || 'draft').replace(/[^\w\-]+/g, '-');
+                  a.href = url;
+                  a.download = `${safeTitle}.md`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-2 py-1 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> 下载 .md
+              </button>
+            </div>
+          </div>
+          <div className="prose prose-invert max-w-none text-sm">
+            <ReactMarkdown>{blogDraft.markdown}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="p-4 bg-black/80 backdrop-blur-xl border-t border-white/10">
+        {sttError && (
+          <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md p-2 flex items-center justify-between">
+            <span>{sttError}</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setSttError(null)} className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/15">忽略</button>
+              <button onClick={setupRecognition} className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500">重试</button>
+            </div>
+          </div>
+        )}
         {/* Voice Visualizer */}
         <AnimatePresence>
           {isRecording && (
