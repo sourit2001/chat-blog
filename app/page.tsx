@@ -14,20 +14,88 @@ type ParsedMbtiReply = {
 
 const allMbtiRoles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
 
+const themes = {
+  green: {
+    bg: 'from-emerald-50 via-teal-50 to-lime-50',
+    text: 'text-emerald-950',
+    textSub: 'text-emerald-700',
+    accentFrom: 'from-emerald-400',
+    accentTo: 'to-teal-400',
+    button: 'bg-emerald-500 hover:bg-emerald-600 text-white',
+    bubbleUser: 'bg-emerald-500 text-white',
+    bubbleBot: 'bg-white/90 text-emerald-950 border border-emerald-100 shadow shadow-emerald-100/60',
+    inputBg: 'bg-white/85 border border-emerald-100 text-emerald-900 placeholder-emerald-600/70',
+    cardBg: 'bg-white/90 border border-emerald-100 text-emerald-900 shadow shadow-emerald-100/60',
+  },
+  lavender: {
+    bg: 'from-violet-50 via-purple-50 to-fuchsia-50',
+    text: 'text-violet-950',
+    textSub: 'text-violet-700',
+    accentFrom: 'from-violet-400',
+    accentTo: 'to-purple-400',
+    button: 'bg-violet-500 hover:bg-violet-600 text-white',
+    bubbleUser: 'bg-violet-500 text-white',
+    bubbleBot: 'bg-white/90 text-violet-950 border border-violet-100 shadow shadow-violet-100/60',
+    inputBg: 'bg-white/85 border border-violet-100 text-violet-900 placeholder-violet-600/70',
+    cardBg: 'bg-white/90 border border-violet-100 text-violet-900 shadow shadow-violet-100/60',
+  },
+  pink: {
+    bg: 'from-rose-50 via-pink-50 to-red-50',
+    text: 'text-rose-950',
+    textSub: 'text-rose-700',
+    accentFrom: 'from-rose-400',
+    accentTo: 'to-pink-400',
+    button: 'bg-rose-500 hover:bg-rose-600 text-white',
+    bubbleUser: 'bg-rose-500 text-white',
+    bubbleBot: 'bg-white/90 text-rose-950 border border-rose-100 shadow shadow-rose-100/60',
+    inputBg: 'bg-white/85 border border-rose-100 text-rose-900 placeholder-rose-600/70',
+    cardBg: 'bg-white/90 border border-rose-100 text-rose-900 shadow shadow-rose-100/60',
+  },
+  butter: {
+    bg: 'from-amber-50 via-yellow-50 to-orange-50',
+    text: 'text-amber-950',
+    textSub: 'text-amber-700',
+    accentFrom: 'from-amber-400',
+    accentTo: 'to-yellow-400',
+    button: 'bg-amber-500 hover:bg-amber-600 text-white',
+    bubbleUser: 'bg-amber-500 text-white',
+    bubbleBot: 'bg-white/90 text-amber-950 border border-amber-100 shadow shadow-amber-100/60',
+    inputBg: 'bg-white/85 border border-amber-100 text-amber-900 placeholder-amber-600/70',
+    cardBg: 'bg-white/90 border border-amber-100 text-amber-900 shadow shadow-amber-100/60',
+  },
+} as const;
+
+const getRoleEmoji = (role: string) => {
+  switch (role) {
+    case 'ENTJ':
+      return '🧠';
+    case 'ISTJ':
+      return '🧩';
+    case 'ENFP':
+      return '🌟';
+    case 'INFP':
+      return '🌿';
+    case 'ENFJ':
+      return '😊';
+    default:
+      return '💬';
+  }
+};
+
 const getRoleAvatarClass = (role: string) => {
   switch (role) {
     case 'ENTJ':
-      return 'from-emerald-500 to-emerald-700';
+      return 'from-emerald-400 to-emerald-600';
     case 'ISTJ':
-      return 'from-sky-500 to-cyan-600';
+      return 'from-sky-400 to-cyan-500';
     case 'ENFP':
-      return 'from-orange-400 to-amber-500';
+      return 'from-orange-300 to-amber-400';
     case 'INFP':
-      return 'from-teal-400 to-emerald-500';
+      return 'from-teal-300 to-emerald-400';
     case 'ENFJ':
-      return 'from-rose-400 to-pink-500';
+      return 'from-rose-300 to-pink-400';
     default:
-      return 'from-emerald-500 to-lime-500';
+      return 'from-emerald-400 to-lime-500';
   }
 };
 
@@ -48,39 +116,42 @@ const getRoleStatusText = (role: string) => {
   }
 };
 
-function MbtiReply({ parsed, messageId }: { parsed: ParsedMbtiReply; messageId: string }) {
+function MbtiReply({ parsed, messageId, theme }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes }) {
   const [visibleCount, setVisibleCount] = useState(0);
 
+  // 当消息 ID 变化时，初始化可见计数（避免每次流式内容变化都重置）
   useEffect(() => {
     setVisibleCount(0);
-    if (!parsed.roles.length) return;
+  }, [messageId]);
 
-    let index = 0;
+  // 在角色数量增长时，逐步增加可见计数；不因 parsed 对象变化而重置
+  useEffect(() => {
+    if (parsed.roles.length === 0) return;
+    if (visibleCount >= parsed.roles.length) return;
+
     const interval = setInterval(() => {
-      index += 1;
-      if (index > parsed.roles.length) {
-        clearInterval(interval);
-        return;
-      }
-      setVisibleCount(index);
+      setVisibleCount((prev) => {
+        if (prev >= parsed.roles.length) return prev;
+        return prev + 1;
+      });
     }, 700);
 
     return () => clearInterval(interval);
-  }, [parsed, messageId]);
+  }, [parsed.roles.length, visibleCount]);
 
   const visibleRoles = parsed.roles.slice(0, visibleCount || 1);
   const spokenRoles = new Set(parsed.roles.map((r) => r.role));
   const silentRoles = allMbtiRoles.filter((r) => !spokenRoles.has(r));
 
   return (
-    <div className="space-y-2">
+    <div className={`space-y-3 ${themes[theme].text}`}>
       {parsed.intro && (
         <div className="flex gap-3">
-          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr from-emerald-500 to-lime-500">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-9 h-9 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr from-pink-300 to-rose-400 shadow-lg shadow-rose-400/20">
+            <span className="text-base">✨</span>
           </div>
-          <div className="p-3 rounded-2xl max-w-[85%] backdrop-blur-sm bg-white/10 text-gray-200 rounded-tl-none">
-            <div className="text-sm prose prose-invert max-w-none">
+          <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md rounded-tl-none ${themes[theme].cardBg}`}>
+            <div className="text-sm prose max-w-none">
               <ReactMarkdown>{parsed.intro}</ReactMarkdown>
             </div>
           </div>
@@ -89,11 +160,11 @@ function MbtiReply({ parsed, messageId }: { parsed: ParsedMbtiReply; messageId: 
 
       {visibleRoles.map((block) => (
         <div key={`${messageId}-${block.role}`} className="flex gap-3">
-          <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role)}`}>
-            <span className="text-[10px] font-semibold">{block.role}</span>
+          <div className={`w-9 h-9 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role)} shadow-lg shadow-emerald-300/15`}>
+            <span className="text-[11px] font-semibold">{getRoleEmoji(block.role)}</span>
           </div>
-          <div className="p-3 rounded-2xl max-w-[85%] backdrop-blur-sm bg-white/10 text-gray-200 rounded-tl-none">
-            <div className="text-sm prose prose-invert max-w-none">
+          <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md rounded-tl-none ${themes[theme].cardBg}`}>
+            <div className="text-sm prose max-w-none">
               <ReactMarkdown>{block.text}</ReactMarkdown>
             </div>
           </div>
@@ -101,16 +172,16 @@ function MbtiReply({ parsed, messageId }: { parsed: ParsedMbtiReply; messageId: 
       ))}
 
       {silentRoles.length > 0 && (
-        <div className="mt-1 flex flex-col gap-1 pl-11">
+        <div className="mt-1.5 flex flex-col gap-1.5 pl-12">
           {silentRoles.map((role) => (
             <div
               key={`${messageId}-${role}-status`}
-              className="flex items-center gap-2 text-xs text-gray-500"
+              className={`flex items-center gap-2 text-xs ${themes[theme].textSub}`}
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role)} opacity-40`}
+                className={`w-5 h-5 rounded-xl flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role)} opacity-50`}
               >
-                <span className="text-[9px] font-semibold">{role}</span>
+                <span className="text-[9px]">{getRoleEmoji(role)}</span>
               </div>
               <span>{getRoleStatusText(role)}</span>
             </div>
@@ -137,8 +208,10 @@ export default function Home() {
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
   const [sttError, setSttError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<keyof typeof themes>('green');
 
   const isLoading = status === 'submitted' || status === 'streaming';
+  const hasMessages = messages.length > 0;
 
   // Keep inputRef synced with inputValue
   useEffect(() => {
@@ -345,62 +418,68 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col h-[100dvh] bg-black text-white overflow-hidden">
+    <main className={`relative flex flex-col h-[100dvh] overflow-hidden ${themes[theme].text}`}>
+      <div className={`absolute inset-0 -z-10 bg-gradient-to-br ${themes[theme].bg}`} />
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/50 backdrop-blur-md z-10">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-white/40 bg-white/60 backdrop-blur-xl z-10 shadow-sm rounded-b-3xl">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-lime-500 flex items-center justify-center">
+          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo} flex items-center justify-center`}>
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <h1 className="font-semibold text-lg tracking-tight">IdeaFlow</h1>
         </div>
-        <div className="flex gap-2">
-          {messages.length > 0 && (
-            <>
-              <button
-                onClick={handleCopy}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
-                title="Copy last response"
-              >
-                {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    setBlogLoading(true);
-                    const res = await fetch('/api/blog', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ messages }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
-                    setBlogDraft({ title: data.title, markdown: data.markdown });
-                  } catch (e) {
-                    console.error('Blog generation failed', e);
-                    alert('生成博客失败，请重试');
-                  } finally {
-                    setBlogLoading(false);
-                  }
-                }}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white disabled:opacity-50"
-                title="生成博客"
-                disabled={blogLoading}
-              >
-                <FileText className="w-5 h-5" />
-              </button>
-              <button
-                onClick={clearChat}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-red-400"
-                title="Clear chat"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </>
-          )}
-          <button className="p-2 hover:bg-white/10 rounded-full transition-colors">
-            <Menu className="w-6 h-6" />
-          </button>
+        <div className="flex gap-2 items-center">
+          <>
+            <button
+              onClick={() => hasMessages && handleCopy()}
+              className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'}`}
+              title="Copy last response"
+              disabled={!hasMessages}
+            >
+              {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={async () => {
+                if (!hasMessages) return;
+                try {
+                  setBlogLoading(true);
+                  const res = await fetch('/api/blog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
+                  setBlogDraft({ title: data.title, markdown: data.markdown });
+                } catch (e) {
+                  console.error('Blog generation failed', e);
+                  alert('生成博客失败，请重试');
+                } finally {
+                  setBlogLoading(false);
+                }
+              }}
+              className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'} disabled:opacity-50`}
+              title="生成博客"
+              disabled={!hasMessages || blogLoading}
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => hasMessages && clearChat()}
+              className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-red-500' : 'text-gray-400 cursor-not-allowed'}`}
+              title="Clear chat"
+              disabled={!hasMessages}
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </>
+          <div className="hidden sm:flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner">
+            <button onClick={() => setTheme('green')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='green' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌿</button>
+            <button onClick={() => setTheme('lavender')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='lavender' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>💜</button>
+            <button onClick={() => setTheme('pink')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='pink' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌸</button>
+            <button onClick={() => setTheme('butter')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
+          </div>
+          <button className={`p-2 rounded-full transition-colors hover:bg-black/5 ${themes[theme].textSub}`}><Menu className="w-6 h-6" /></button>
         </div>
       </header>
 
@@ -408,11 +487,11 @@ export default function Home() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
         {messages.length === 0 && (
           <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-lime-500 flex-shrink-0 flex items-center justify-center mt-1">
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo} flex-shrink-0 flex items-center justify-center mt-1`}>
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <div className="bg-white/10 p-3 rounded-2xl rounded-tl-none max-w-[85%] backdrop-blur-sm">
-              <p className="text-sm text-gray-200">
+            <div className={`p-4 rounded-3xl rounded-tl-none max-w-[85%] backdrop-blur-md ${themes[theme].cardBg}`}>
+              <p className="text-sm">
                 Hello! I'm your creative partner. Tell me what's on your mind, and let's turn it into a blog post.
               </p>
             </div>
@@ -428,11 +507,11 @@ export default function Home() {
           if (m.role !== 'assistant' || !hasRoles) {
             return (
               <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 ${m.role === 'user' ? 'bg-gray-700' : 'bg-gradient-to-tr from-emerald-500 to-lime-500'}`}>
-                  {m.role === 'user' ? <div className="text-xs">You</div> : <Sparkles className="w-4 h-4 text-white" />}
+                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow ${m.role === 'user' ? 'bg-gray-400 text-gray-900' : `bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo}`}`}>
+                  {m.role === 'user' ? <div className="text-xs font-semibold">You</div> : <Sparkles className="w-4 h-4 text-white" />}
                 </div>
-                <div className={`p-3 rounded-2xl max-w-[85%] backdrop-blur-sm ${m.role === 'user' ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-white/10 text-gray-200 rounded-tl-none'}`}>
-                  <div className="text-sm prose prose-invert max-w-none">
+                <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md shadow ${m.role === 'user' ? `${themes[theme].bubbleUser} rounded-tr-none` : `${themes[theme].bubbleBot} rounded-tl-none`}`}>
+                  <div className={`text-sm prose max-w-none ${m.role === 'user' ? 'prose-invert' : ''}`}>
                     <ReactMarkdown>{content}</ReactMarkdown>
                   </div>
                 </div>
@@ -441,7 +520,7 @@ export default function Home() {
           }
 
           return (
-            <MbtiReply key={m.id} parsed={parsed!} messageId={m.id} />
+            <MbtiReply key={m.id} parsed={parsed!} messageId={m.id} theme={theme} />
           );
         })}
       </div>
@@ -483,7 +562,7 @@ export default function Home() {
       )}
 
       {/* Input Area */}
-      <div className="p-4 bg-black/80 backdrop-blur-xl border-t border-white/10">
+      <div className="p-4 bg-white/60 backdrop-blur-2xl border-t border-white/40 shadow-inner">
         {sttError && (
           <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md p-2 flex items-center justify-between">
             <span>{sttError}</span>
@@ -514,26 +593,25 @@ export default function Home() {
         </AnimatePresence>
 
         <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-          <div className="flex-1 bg-white/10 rounded-2xl flex items-center p-1 pl-4 transition-colors focus-within:bg-white/15">
+          <div className={`flex-1 rounded-3xl flex items-center p-1.5 pl-4 transition-all focus-within:shadow-lg shadow ${themes[theme].inputBg}`}>
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Type or speak..."
-              className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-500 py-3 min-h-[44px]"
+              className={`flex-1 bg-transparent border-none outline-none py-3 min-h-[44px] ${themes[theme].text}`}
             />
             <button
               type="button"
               onClick={toggleRecording}
-              className={`p-2 rounded-xl transition-all ${isRecording ? "text-red-400 bg-red-400/10" : "text-gray-400 hover:text-white"
-                }`}
+              className={`p-2 rounded-2xl transition-all ${isRecording ? "text-red-600 bg-red-100" : `${themes[theme].textSub} hover:bg-black/5`}`}
             >
               <Mic className="w-5 h-5" />
             </button>
           </div>
           <button
             type="submit"
-            className="p-3 bg-emerald-600 rounded-full text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`p-3 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${themes[theme].button}`}
             disabled={!inputValue && !isRecording}
           >
             <Send className="w-5 h-5" />
