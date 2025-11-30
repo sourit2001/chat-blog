@@ -329,7 +329,7 @@ export default function Home() {
   const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [ttsVoice, setTtsVoice] = useState<'female' | 'male'>(viewMode === 'game' ? 'male' : 'female');
+  const [ttsVoice, setTtsVoice] = useState<'female' | 'male' | 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'>(viewMode === 'game' ? 'male' : 'female');
 
   const isLoading = status === 'submitted' || status === 'streaming';
   const hasMessages = messages.length > 0;
