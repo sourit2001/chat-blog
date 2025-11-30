@@ -11,7 +11,7 @@ const voicePresets: Record<string, string> = {
   shenxinghui: "Chinese (Mandarin)_Gentle_Youth",          // 沈星回：温柔青年
   qinche: "Chinese (Mandarin)_Reliable_Executive",         // 秦彻：可靠高管（成熟低沉）
   qiyu: "Chinese (Mandarin)_Straightforward_Boy",          // 祁煜：直率少年（活泼直接）
-  lishen: "Chinese (Mandarin)_News_Anchor",                // 黎深：新闻主播（专业冷静）
+  lishen: "Chinese (Mandarin)_Gentleman",                  // 黎深：绅士温和男声
   xiayizhou: "Chinese (Mandarin)_Southern_Young_Man",      // 夏以昼：南方年轻人（温暖亲切）
 };
 
