@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText, Download } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText, Download, Volume2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import AudioVisualizer from "@/components/AudioVisualizer";
@@ -11,6 +12,8 @@ type ParsedMbtiReply = {
   intro: string;
   roles: { role: string; text: string }[];
 };
+
+type ViewMode = 'mbti' | 'game';
 
 const allMbtiRoles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
 
@@ -65,12 +68,30 @@ const themes = {
   },
 } as const;
 
-const getRoleEmoji = (role: string) => {
+const getRoleEmoji = (role: string, mode: ViewMode) => {
+  if (mode === 'game') {
+    // 游戏小队视角：将 MBTI 槽位映射为《恋与深空》五位男主
+    switch (role) {
+      case 'ENTJ':
+        return '\ud83d\udd25'; // 祁煜：火系、行动力强
+      case 'ISTJ':
+        return '\ud83e\ude7a'; // 黎深：医生、温柔克制
+      case 'ENFP':
+        return '\u2600\ufe0f'; // 沈星回：明亮、阳光少年
+      case 'INFP':
+        return '\ud83c\udfa8'; // 夏以昼：艺术气息、温柔细腻
+      case 'ENFJ':
+        return '\ud83c\udf11'; // 秦彻：危险感与守护并存
+      default:
+        return '\ud83c\udfae';
+    }
+  }
+
   switch (role) {
     case 'ENTJ':
       return '🧠';
     case 'ISTJ':
-      return '🧩';
+      return '�';
     case 'ENFP':
       return '🌟';
     case 'INFP':
@@ -82,7 +103,46 @@ const getRoleEmoji = (role: string) => {
   }
 };
 
-const getRoleAvatarClass = (role: string) => {
+const getRoleLabel = (role: string, mode: ViewMode) => {
+  if (mode === 'game') {
+    switch (role) {
+      case 'ENTJ':
+        return '祁煜';
+      case 'ISTJ':
+        return '黎深';
+      case 'ENFP':
+        return '沈星回';
+      case 'INFP':
+        return '夏以昼';
+      case 'ENFJ':
+        return '秦彻';
+      default:
+        return '';
+    }
+  }
+  return role;
+};
+
+const getRoleAvatarClass = (role: string, mode: ViewMode) => {
+  if (mode === 'game') {
+    // 游戏小队视角下，为五位男主配置偏角色感的颜色
+    switch (role) {
+      case 'ENTJ':
+        return 'from-rose-500 to-orange-500'; // 祁煜：火系、冲劲
+      case 'ISTJ':
+        return 'from-sky-500 to-cyan-500'; // 黎深：冷静、治愈
+      case 'ENFP':
+        return 'from-yellow-300 to-amber-400'; // 沈星回：明亮阳光
+      case 'INFP':
+        return 'from-emerald-300 to-teal-400'; // 夏以昼：柔和治愈
+      case 'ENFJ':
+        return 'from-slate-700 to-violet-700'; // 秦彻：暗色危感
+      default:
+        return 'from-slate-500 to-slate-400';
+    }
+  }
+
+  // MBTI 视角下的默认颜色
   switch (role) {
     case 'ENTJ':
       return 'from-emerald-400 to-emerald-600';
@@ -99,7 +159,24 @@ const getRoleAvatarClass = (role: string) => {
   }
 };
 
-const getRoleStatusText = (role: string) => {
+const getRoleStatusText = (role: string, mode: ViewMode) => {
+  if (mode === 'game') {
+    switch (role) {
+      case 'ENTJ':
+        return '祁煜一边检查装备一边抬眼打量战场，话不多，却已经在心里替你把所有退路都想好。';
+      case 'ISTJ':
+        return '黎深安静地站在你身侧，目光细致地扫过每一个细节，用平稳的语气把风险和解决办法一条条说给你听。';
+      case 'ENFP':
+        return '沈星回总能先发现好玩的角度，他一边和你聊天一边帮你拆解难题，让气氛一点点从紧绷变得明亮。';
+      case 'INFP':
+        return '夏以昼悄悄记下你说过的每一句话，用温柔的视角补全那些你没来得及说出口的情绪。';
+      case 'ENFJ':
+        return '秦彻像是在旁观一切，却始终把你放在视线中央，只在必要的时候出声，把你从危险的边缘拉回来。';
+      default:
+        return '他们各自在自己的位置行动着，不约而同地把你放进自己的计划里。';
+    }
+  }
+
   switch (role) {
     case 'ENTJ':
       return '正在快速扫一眼全局，还在想怎么帮你定方向。';
@@ -116,7 +193,7 @@ const getRoleStatusText = (role: string) => {
   }
 };
 
-function MbtiReply({ parsed, messageId, theme }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes }) {
+function MbtiReply({ parsed, messageId, theme, viewMode }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes; viewMode: ViewMode }) {
   const [visibleCount, setVisibleCount] = useState(0);
 
   // 当消息 ID 变化时，初始化可见计数（避免每次流式内容变化都重置）
@@ -160,11 +237,22 @@ function MbtiReply({ parsed, messageId, theme }: { parsed: ParsedMbtiReply; mess
 
       {visibleRoles.map((block) => (
         <div key={`${messageId}-${block.role}`} className="flex gap-3">
-          <div className={`w-9 h-9 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role)} shadow-lg shadow-emerald-300/15`}>
-            <span className="text-[11px] font-semibold">{getRoleEmoji(block.role)}</span>
+          <div className={`w-9 h-9 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role, viewMode)} shadow-lg shadow-emerald-300/15`}>
+            {viewMode === 'game' ? (
+              <span className="text-[10px] font-semibold leading-none tracking-tight">
+                {getRoleLabel(block.role, viewMode)}
+              </span>
+            ) : (
+              <span className="text-[11px] font-semibold">{getRoleEmoji(block.role, viewMode)}</span>
+            )}
           </div>
           <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md rounded-tl-none ${themes[theme].cardBg}`}>
             <div className="text-sm prose max-w-none">
+              {viewMode === 'game' && getRoleLabel(block.role, viewMode) && (
+                <div className="text-[11px] font-semibold mb-1 opacity-80">
+                  {getRoleLabel(block.role, viewMode)}
+                </div>
+              )}
               <ReactMarkdown>{block.text}</ReactMarkdown>
             </div>
           </div>
@@ -179,11 +267,18 @@ function MbtiReply({ parsed, messageId, theme }: { parsed: ParsedMbtiReply; mess
               className={`flex items-center gap-2 text-xs ${themes[theme].textSub}`}
             >
               <div
-                className={`w-5 h-5 rounded-xl flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role)} opacity-50`}
+                className={`w-5 h-5 rounded-xl flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role, viewMode)} opacity-50`}
               >
-                <span className="text-[9px]">{getRoleEmoji(role)}</span>
+                {viewMode !== 'game' && (
+                  <span className="text-[9px]">{getRoleEmoji(role, viewMode)}</span>
+                )}
               </div>
-              <span>{getRoleStatusText(role)}</span>
+              <span>
+                {viewMode === 'game' && getRoleLabel(role, viewMode) && (
+                  <span className="font-semibold mr-1">{getRoleLabel(role, viewMode)}：</span>
+                )}
+                {getRoleStatusText(role, viewMode)}
+              </span>
             </div>
           ))}
         </div>
@@ -193,9 +288,48 @@ function MbtiReply({ parsed, messageId, theme }: { parsed: ParsedMbtiReply; mess
 }
 
 export default function Home() {
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const pathname = usePathname();
+  const isRootPath = pathname === '/';
+  const [viewMode, setViewMode] = useState<ViewMode>('mbti');
+  const fixedMode: ViewMode | null = pathname?.startsWith('/lysk')
+    ? 'game'
+    : pathname?.startsWith('/mbti')
+    ? 'mbti'
+    : null;
+  useEffect(() => {
+    if (fixedMode && viewMode !== fixedMode) {
+      setViewMode(fixedMode);
+      setTtsVoice(fixedMode === 'game' ? 'male' : 'female');
+    }
+  }, [fixedMode]);
+  const chatMbti = useChat({
+    api: '/api/chat',
     onError: (err) => console.error("Chat error:", err),
+    fetch: async (input, init) => {
+      console.log('[MBTI] Original body:', init?.body);
+      const body = JSON.parse(init?.body as string || '{}');
+      body.viewMode = 'mbti';
+      const newBody = JSON.stringify(body);
+      console.log('[MBTI] Modified body:', newBody);
+      return fetch(input, { ...init, body: newBody });
+    },
   });
+  const chatGame = useChat({
+    api: '/api/chat',
+    onError: (err) => console.error("Chat error:", err),
+    fetch: async (input, init) => {
+      console.log('[GAME] Original body:', init?.body);
+      const body = JSON.parse(init?.body as string || '{}');
+      body.viewMode = 'game';
+      const newBody = JSON.stringify(body);
+      console.log('[GAME] Modified body:', newBody);
+      return fetch(input, { ...init, body: newBody });
+    },
+  });
+  const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
+  const status = viewMode === 'mbti' ? chatMbti.status : chatGame.status;
+  const setMessagesActive = viewMode === 'mbti' ? chatMbti.setMessages : chatGame.setMessages;
+  const sendMessageActive = viewMode === 'mbti' ? chatMbti.sendMessage : chatGame.sendMessage;
 
   const [isRecording, setIsRecording] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -204,11 +338,16 @@ export default function Home() {
   const [blogDraft, setBlogDraft] = useState<{ title: string; markdown: string } | null>(null);
   const [blogLoading, setBlogLoading] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const recognitionActiveRef = useRef<boolean>(false);
   const inputRef = useRef(inputValue);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
   const [sttError, setSttError] = useState<string | null>(null);
   const [theme, setTheme] = useState<keyof typeof themes>('green');
+  const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [ttsVoice, setTtsVoice] = useState<'female' | 'male'>(viewMode === 'game' ? 'male' : 'female');
 
   const isLoading = status === 'submitted' || status === 'streaming';
   const hasMessages = messages.length > 0;
@@ -241,8 +380,16 @@ export default function Home() {
     let buffer: string[] = [];
     const roleBlocks: { role: Role; text: string }[] = [];
 
-    // 允许前面有 Markdown 标记或列表前缀，例如 - ENTJ：、* ENFP：、**ENTJ：、### ENTJ：
-    const roleRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(ENTJ|ISTJ|ENFP|INFP|ENFJ)[：:]/;
+    // 允许前面有 Markdown 标记或列表前缀，识别 MBTI 或 男主中文名
+    // 中文名与 MBTI 槽位映射：ENTJ->祁煜, ISTJ->黎深, ENFP->沈星回, INFP->夏以昼, ENFJ->秦彻
+    const nameToSlot: Record<string, Role> = {
+      '祁煜': 'ENTJ',
+      '黎深': 'ISTJ',
+      '沈星回': 'ENFP',
+      '夏以昼': 'INFP',
+      '秦彻': 'ENFJ',
+    };
+    const roleRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(ENTJ|ISTJ|ENFP|INFP|ENFJ|祁煜|黎深|沈星回|夏以昼|秦彻)[：:]/;
 
     for (const line of lines) {
       const match = line.match(roleRegex);
@@ -252,7 +399,9 @@ export default function Home() {
         } else if (buffer.length > 0) {
           introLines = buffer.slice();
         }
-        currentRole = match[1] as Role;
+        const tag = match[1];
+        const mapped = (nameToSlot as any)[tag] || tag;
+        currentRole = mapped as Role;
         buffer = [line.replace(roleRegex, '').trim()];
       } else {
         buffer.push(line);
@@ -271,33 +420,6 @@ export default function Home() {
     };
   };
 
-  // Text-to-Speech for AI responses
-  useEffect(() => {
-    if (!isLoading && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      const content = getMessageContent(lastMessage);
-
-      if (lastMessage.role === 'assistant' && lastMessage.id !== lastSpokenMessageIdRef.current) {
-        lastSpokenMessageIdRef.current = lastMessage.id;
-        if (content) speak(content);
-      }
-    }
-  }, [messages, isLoading]);
-
-  const speak = (text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Stop previous
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN'; // Chinese
-      // Try to find a good voice
-      const voices = window.speechSynthesis.getVoices();
-      const zhVoice = voices.find(v => v.lang.includes('zh') && !v.name.includes('Hong Kong')); // Prefer mainland Chinese
-      if (zhVoice) utterance.voice = zhVoice;
-
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
   const handleCopy = () => {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === "assistant") {
@@ -308,9 +430,80 @@ export default function Home() {
     }
   };
 
+  // 自动朗读最新的助手回复（使用 Gemini 语音）
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role !== 'assistant') return;
+      if (lastMessage.id === lastSpokenMessageIdRef.current) return;
+      const content = getMessageContent(lastMessage);
+      if (!content?.trim()) return;
+      lastSpokenMessageIdRef.current = lastMessage.id;
+      handlePlayVoice(lastMessage.id, content);
+    }
+  }, [messages, isLoading]);
+
   const clearChat = () => {
-    setMessages([]);
-    window.speechSynthesis.cancel();
+    setMessagesActive([]);
+    window.speechSynthesis?.cancel?.();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  };
+
+  const handlePlayVoice = async (messageId: string, text: string) => {
+    if (!text?.trim()) return;
+    // 在游戏小队模式下，将可能出现的 MBTI 槽位前缀映射为男主姓名，保证语音播报听到的是名字
+    let textToSpeak = text;
+    if (viewMode === 'game') {
+      const mappings: Array<[RegExp, string]> = [
+        [/^\s*ENTJ[：:]/gm, '祁煜：'],
+        [/^\s*ISTJ[：:]/gm, '黎深：'],
+        [/^\s*ENFP[：:]/gm, '沈星回：'],
+        [/^\s*INFP[：:]/gm, '夏以昼：'],
+        [/^\s*ENFJ[：:]/gm, '秦彻：'],
+      ];
+      for (const [re, rep] of mappings) {
+        textToSpeak = textToSpeak.replace(re, rep);
+      }
+    }
+    
+    // 根据发言角色选择专属声音
+    let voiceToUse = ttsVoice;
+    if (viewMode === 'game') {
+      if (textToSpeak.includes('沈星回：')) voiceToUse = 'shenxinghui';
+      else if (textToSpeak.includes('秦彻：')) voiceToUse = 'qinche';
+      else if (textToSpeak.includes('祁煜：')) voiceToUse = 'qiyu';
+      else if (textToSpeak.includes('黎深：')) voiceToUse = 'lishen';
+      else if (textToSpeak.includes('夏以昼：')) voiceToUse = 'xiayizhou';
+    }
+    
+    setTtsError(null);
+    setTtsLoadingId(messageId);
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSpeak, voice: voiceToUse }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '生成语音失败');
+      const src = data.audioUrl as string;
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      } else {
+        audioRef.current.pause();
+      }
+      audioRef.current.src = src;
+      await audioRef.current.play();
+      lastSpokenMessageIdRef.current = messageId;
+    } catch (err: any) {
+      console.error('Gemini TTS failed', err);
+      setTtsError(err?.message || '生成语音失败，请稍后再试');
+    } finally {
+      setTtsLoadingId(null);
+    }
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -321,7 +514,7 @@ export default function Home() {
     setInputValue(""); // Clear input immediately
 
     try {
-      await sendMessage({ role: 'user', content } as any);
+      await sendMessageActive({ role: 'user', content } as any);
     } catch (err) {
       console.error("Failed to send message:", err);
     }
@@ -346,6 +539,13 @@ export default function Home() {
       recognition.interimResults = true;
       recognition.lang = 'zh-CN';
 
+      recognition.onstart = () => {
+        recognitionActiveRef.current = true;
+      };
+      recognition.onend = () => {
+        recognitionActiveRef.current = false;
+      };
+
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -362,7 +562,7 @@ export default function Home() {
               stopRecording();
               const content = inputRef.current;
               setInputValue('');
-              sendMessage({ role: 'user', content } as any).catch(err => console.error('Auto-send failed:', err));
+              sendMessageActive({ role: 'user', content } as any).catch(err => console.error('Auto-send failed:', err));
             }
           }, 2000);
         }
@@ -373,7 +573,9 @@ export default function Home() {
         setSttError(`语音识别错误：${event.error}`);
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         setIsRecording(false);
-        try { recognition.stop(); } catch {}
+        try {
+          if (recognitionActiveRef.current) recognition.stop();
+        } catch {}
       };
 
       recognitionRef.current = recognition;
@@ -386,14 +588,19 @@ export default function Home() {
 
   useEffect(() => {
     setupRecognition();
-  }, [sendMessage]);
+  }, [viewMode]);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setAudioStream(stream);
       setIsRecording(true);
-      recognitionRef.current?.start();
+      if (!recognitionActiveRef.current) {
+        try { recognitionRef.current?.start(); } catch (e) {
+          // Ignore InvalidStateError when already started
+          console.warn('recognition.start skipped:', e);
+        }
+      }
     } catch (err) {
       console.error("Error accessing microphone:", err);
     }
@@ -405,7 +612,9 @@ export default function Home() {
       setAudioStream(null);
     }
     setIsRecording(false);
-    recognitionRef.current?.stop();
+    try {
+      if (recognitionActiveRef.current) recognitionRef.current?.stop();
+    } catch {}
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
   };
 
@@ -422,11 +631,59 @@ export default function Home() {
       <div className={`absolute inset-0 -z-10 bg-gradient-to-br ${themes[theme].bg}`} />
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-white/40 bg-white/60 backdrop-blur-xl z-10 shadow-sm rounded-b-3xl">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo} flex items-center justify-center`}>
-            <Sparkles className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo} flex items-center justify-center`}>
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="font-semibold text-lg tracking-tight">IdeaFlow</h1>
           </div>
-          <h1 className="font-semibold text-lg tracking-tight">IdeaFlow</h1>
+          {/* Desktop Navigation */}
+          <nav className="hidden sm:flex items-center gap-2 text-sm">
+            <a 
+              href="/mbti" 
+              className={`px-4 py-1.5 rounded-full font-medium transition ${
+                pathname?.startsWith('/mbti') 
+                  ? 'bg-emerald-500 text-white shadow-md' 
+                  : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
+              }`}
+            >
+              MBTI
+            </a>
+            <a 
+              href="/lysk" 
+              className={`px-4 py-1.5 rounded-full font-medium transition ${
+                pathname?.startsWith('/lysk') 
+                  ? 'bg-purple-500 text-white shadow-md' 
+                  : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+              }`}
+            >
+              恋与深空
+            </a>
+          </nav>
+          {/* Mobile Navigation */}
+          <nav className="flex sm:hidden items-center gap-1.5 text-xs">
+            <a 
+              href="/mbti" 
+              className={`px-3 py-1 rounded-full font-medium transition ${
+                pathname?.startsWith('/mbti') 
+                  ? 'bg-emerald-500 text-white shadow-md' 
+                  : 'bg-emerald-100 text-emerald-700'
+              }`}
+            >
+              MBTI
+            </a>
+            <a 
+              href="/lysk" 
+              className={`px-3 py-1 rounded-full font-medium transition ${
+                pathname?.startsWith('/lysk') 
+                  ? 'bg-purple-500 text-white shadow-md' 
+                  : 'bg-purple-100 text-purple-700'
+              }`}
+            >
+              恋与深空
+            </a>
+          </nav>
         </div>
         <div className="flex gap-2 items-center">
           <>
@@ -479,6 +736,44 @@ export default function Home() {
             <button onClick={() => setTheme('pink')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='pink' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌸</button>
             <button onClick={() => setTheme('butter')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
           </div>
+          <div className="flex sm:hidden items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner">
+            <button onClick={() => setTheme('green')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='green' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌿</button>
+            <button onClick={() => setTheme('lavender')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='lavender' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>💜</button>
+            <button onClick={() => setTheme('pink')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='pink' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌸</button>
+            <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
+          </div>
+          {!fixedMode && (
+          <div className="hidden sm:flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-xs">
+            <button
+              onClick={() => setViewMode('mbti')}
+              className={`px-2 py-1 rounded-full transition ${viewMode==='mbti' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              MBTI 团队
+            </button>
+            <button
+              onClick={() => setViewMode('game')}
+              className={`px-2 py-1 rounded-full transition ${viewMode==='game' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              恋与深空
+            </button>
+          </div>
+          )}
+          {!fixedMode && (
+          <div className="flex sm:hidden items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-[11px]">
+            <button
+              onClick={() => setViewMode('mbti')}
+              className={`px-2 py-0.5 rounded-full transition ${viewMode==='mbti' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              MBTI
+            </button>
+            <button
+              onClick={() => setViewMode('game')}
+              className={`px-2 py-0.5 rounded-full transition ${viewMode==='game' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              恋与深空
+            </button>
+          </div>
+          )}
           <button className={`p-2 rounded-full transition-colors hover:bg-black/5 ${themes[theme].textSub}`}><Menu className="w-6 h-6" /></button>
         </div>
       </header>
@@ -520,7 +815,7 @@ export default function Home() {
           }
 
           return (
-            <MbtiReply key={m.id} parsed={parsed!} messageId={m.id} theme={theme} />
+            <MbtiReply key={m.id} parsed={parsed!} messageId={m.id} theme={theme} viewMode={viewMode} />
           );
         })}
       </div>
