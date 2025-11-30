@@ -436,54 +436,94 @@ export default function Home() {
 
   const handlePlayVoice = async (messageId: string, text: string) => {
     if (!text?.trim()) return;
-    // 在游戏小队模式下，将可能出现的 MBTI 槽位前缀映射为男主姓名，保证语音播报听到的是名字
-    let textToSpeak = text;
+
+    // 在游戏模式下，优先按角色前缀拆分多段语音，并为每段选择对应男主的声音
     if (viewMode === 'game') {
-      const mappings: Array<[RegExp, string]> = [
+      // 1. 先把可能残留的 MBTI 段首前缀替换为男主姓名
+      let normalized = text;
+      const mbtiToName: Array<[RegExp, string]> = [
         [/^\s*ENTJ[：:]/gm, '祁煜：'],
         [/^\s*ISTJ[：:]/gm, '黎深：'],
         [/^\s*ENFP[：:]/gm, '沈星回：'],
         [/^\s*INFP[：:]/gm, '夏以昼：'],
         [/^\s*ENFJ[：:]/gm, '秦彻：'],
       ];
-      for (const [re, rep] of mappings) {
-        textToSpeak = textToSpeak.replace(re, rep);
-      }
-    }
-    
-    // 根据发言角色选择专属声音 - 检测第一个出现的角色名
-    let voiceToUse = ttsVoice;
-    if (viewMode === 'game') {
-      const characterVoices: Array<[string, string]> = [
-        ['沈星回：', 'shenxinghui'],
-        ['秦彻：', 'qinche'],
-        ['祁煜：', 'qiyu'],
-        ['黎深：', 'lishen'],
-        ['夏以昼：', 'xiayizhou'],
-      ];
-      
-      // 找到第一个出现的角色
-      let firstIndex = textToSpeak.length;
-      let firstVoice = ttsVoice;
-      
-      for (const [name, voice] of characterVoices) {
-        const index = textToSpeak.indexOf(name);
-        if (index !== -1 && index < firstIndex) {
-          firstIndex = index;
-          firstVoice = voice;
+      for (const [re, rep] of mbtiToName) normalized = normalized.replace(re, rep);
+
+      // 2. 按角色名前缀拆分段落
+      const segmentRegex = /^(沈星回|黎深|祁煜|夏以昼|秦彻)：([\s\S]*?)(?=^(?:沈星回|黎深|祁煜|夏以昼|秦彻)：|$)/gm;
+      const segments: { speaker: string; voice: 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'; text: string }[] = [];
+
+      const speakerVoiceMap: Record<string, 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'> = {
+        '沈星回': 'shenxinghui',
+        '秦彻': 'qinche',
+        '祁煜': 'qiyu',
+        '黎深': 'lishen',
+        '夏以昼': 'xiayizhou',
+      };
+
+      let match: RegExpExecArray | null;
+      while ((match = segmentRegex.exec(normalized)) !== null) {
+        const speaker = match[1];
+        const content = match[2]?.trim();
+        const voice = speakerVoiceMap[speaker];
+        if (content && voice) {
+          segments.push({ speaker, voice, text: `${speaker}：${content}` });
         }
       }
-      
-      voiceToUse = firstVoice;
+
+      // 如果没有按前缀拆出段落，就退化为整段使用默认男声
+      if (segments.length === 0) {
+        segments.push({ speaker: '群聊', voice: 'shenxinghui', text: normalized });
+      }
+
+      setTtsError(null);
+      setTtsLoadingId(messageId);
+
+      try {
+        // 顺序播放每一段语音
+        for (const seg of segments) {
+          const res = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: seg.text, voice: seg.voice }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '生成语音失败');
+          const src = data.audioUrl as string;
+          if (!audioRef.current) {
+            audioRef.current = new Audio();
+          } else {
+            audioRef.current.pause();
+          }
+          audioRef.current.src = src;
+          // 等待当前语音播放完再播下一段
+          await new Promise<void>((resolve) => {
+            if (!audioRef.current) return resolve();
+            audioRef.current.onended = () => resolve();
+            audioRef.current.play().catch(() => resolve());
+          });
+        }
+        lastSpokenMessageIdRef.current = messageId;
+      } catch (err: any) {
+        console.error('Gemini TTS failed', err);
+        setTtsError(err?.message || '生成语音失败，请稍后再试');
+      } finally {
+        setTtsLoadingId(null);
+      }
+
+      return;
     }
-    
+
+    // MBTI 模式：保持原有整段播报逻辑
+    let textToSpeak = text;
     setTtsError(null);
     setTtsLoadingId(messageId);
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSpeak, voice: voiceToUse }),
+        body: JSON.stringify({ text: textToSpeak, voice: ttsVoice }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '生成语音失败');

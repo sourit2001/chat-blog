@@ -2,17 +2,17 @@ import { NextRequest } from "next/server";
 
 const REPLICATE_VERSION = "43b17801b02267d0baf70071ff440358f75499f20ad5c51118a2fdad14ba9b8c";
 
-// 使用 MiniMax TTS 支持的实际 voice_id - 方案C：极端音色差异
+// 使用 MiniMax TTS 支持的实际 voice_id - 五位男主全部为男声，但音色各不相同
 // 参考: https://replicate.com/minimax/speech-02-turbo/readme
 const voicePresets: Record<string, string> = {
   female: "Chinese (Mandarin)_Sweet_Lady",
   male: "Chinese (Mandarin)_Gentleman",
-  // 恋与深空男主专属声音 - 使用完全不同的音色特征（包括女声/特殊音）
-  shenxinghui: "Chinese (Mandarin)_Soft_Girl",              // 沈星回：温柔女声（温柔治愈反差）
-  qinche: "Chinese (Mandarin)_Reliable_Executive",          // 秦彻：可靠高管（成熟低沉男声）
-  qiyu: "Chinese (Mandarin)_Cute_Spirit",                   // 祁煜：可爱精灵（高音活泼）
-  lishen: "Chinese (Mandarin)_News_Anchor",                 // 黎深：新闻主播（专业冷静男声）
-  xiayizhou: "Chinese (Mandarin)_Radio_Host",               // 夏以昼：电台主持（温暖磁性）
+  // 恋与深空男主专属声音（均为男性音色）：
+  shenxinghui: "Chinese (Mandarin)_Gentle_Youth",          // 沈星回：温柔青年
+  qinche: "Chinese (Mandarin)_Reliable_Executive",         // 秦彻：可靠高管（成熟低沉）
+  qiyu: "Chinese (Mandarin)_Straightforward_Boy",          // 祁煜：直率少年（活泼直接）
+  lishen: "Chinese (Mandarin)_News_Anchor",                // 黎深：新闻主播（专业冷静）
+  xiayizhou: "Chinese (Mandarin)_Southern_Young_Man",      // 夏以昼：南方年轻人（温暖亲切）
 };
 
 export async function POST(req: NextRequest) {
