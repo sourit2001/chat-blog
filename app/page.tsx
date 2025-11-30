@@ -303,28 +303,10 @@ export default function Home() {
     }
   }, [fixedMode]);
   const chatMbti = useChat({
-    api: '/api/chat',
     onError: (err) => console.error("Chat error:", err),
-    fetch: async (input, init) => {
-      console.log('[MBTI] Original body:', init?.body);
-      const body = JSON.parse(init?.body as string || '{}');
-      body.viewMode = 'mbti';
-      const newBody = JSON.stringify(body);
-      console.log('[MBTI] Modified body:', newBody);
-      return fetch(input, { ...init, body: newBody });
-    },
   });
   const chatGame = useChat({
-    api: '/api/chat',
     onError: (err) => console.error("Chat error:", err),
-    fetch: async (input, init) => {
-      console.log('[GAME] Original body:', init?.body);
-      const body = JSON.parse(init?.body as string || '{}');
-      body.viewMode = 'game';
-      const newBody = JSON.stringify(body);
-      console.log('[GAME] Modified body:', newBody);
-      return fetch(input, { ...init, body: newBody });
-    },
   });
   const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
   const status = viewMode === 'mbti' ? chatMbti.status : chatGame.status;
@@ -469,14 +451,30 @@ export default function Home() {
       }
     }
     
-    // 根据发言角色选择专属声音
+    // 根据发言角色选择专属声音 - 检测第一个出现的角色名
     let voiceToUse = ttsVoice;
     if (viewMode === 'game') {
-      if (textToSpeak.includes('沈星回：')) voiceToUse = 'shenxinghui';
-      else if (textToSpeak.includes('秦彻：')) voiceToUse = 'qinche';
-      else if (textToSpeak.includes('祁煜：')) voiceToUse = 'qiyu';
-      else if (textToSpeak.includes('黎深：')) voiceToUse = 'lishen';
-      else if (textToSpeak.includes('夏以昼：')) voiceToUse = 'xiayizhou';
+      const characterVoices: Array<[string, string]> = [
+        ['沈星回：', 'shenxinghui'],
+        ['秦彻：', 'qinche'],
+        ['祁煜：', 'qiyu'],
+        ['黎深：', 'lishen'],
+        ['夏以昼：', 'xiayizhou'],
+      ];
+      
+      // 找到第一个出现的角色
+      let firstIndex = textToSpeak.length;
+      let firstVoice = ttsVoice;
+      
+      for (const [name, voice] of characterVoices) {
+        const index = textToSpeak.indexOf(name);
+        if (index !== -1 && index < firstIndex) {
+          firstIndex = index;
+          firstVoice = voice;
+        }
+      }
+      
+      voiceToUse = firstVoice;
     }
     
     setTtsError(null);
