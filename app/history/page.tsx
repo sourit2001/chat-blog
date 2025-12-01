@@ -16,13 +16,19 @@ export default function HistoryPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+        if (!supabaseClient) {
+          setError('Supabase 未配置：请设置 NEXT_PUBLIC_SUPABASE_URL 与 NEXT_PUBLIC_SUPABASE_ANON_KEY');
+          setLoading(false);
+          return;
+        }
+        const client = supabaseClient;
+        const { data: { user }, error: userErr } = await client.auth.getUser();
         if (userErr) throw userErr;
         if (!user) {
           window.location.href = "/login";
           return;
         }
-        const { data, error } = await supabaseClient
+        const { data, error } = await client
           .from("conversations")
           .select("id, title, view_mode, created_at")
           .eq("user_id", user.id)
