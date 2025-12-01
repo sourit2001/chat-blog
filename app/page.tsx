@@ -328,7 +328,6 @@ export default function Home() {
   const recognitionActiveRef = useRef<boolean>(false);
   const inputRef = useRef(inputValue);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSpokenMessageIdRef = useRef<string | null>(null);
   const [sttError, setSttError] = useState<string | null>(null);
   const [theme, setTheme] = useState<keyof typeof themes>('green');
   const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null);
@@ -338,8 +337,17 @@ export default function Home() {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('text');
   // Conversation storage
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const lastSpokenMessageIdRef = useRef<string | null>(null);
   const lastStoredMessageIdRef = useRef<string | null>(null);
   const lastAssistantDbIdRef = useRef<string | null>(null);
+
+  // 流式 TTS 队列
+  const audioQueueRef = useRef<{ url: string; text: string }[]>([]);
+  const isPlayingQueueRef = useRef(false);
+  const currentStreamingMessageRef = useRef<string | null>(null);
+  const accumulatedTextRef = useRef<string>('');
+  const processedSentencesRef = useRef<Set<string>>(new Set());
+  const ttsProcessedRef = useRef(false);
 
   // Auth state for header
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -446,17 +454,33 @@ export default function Home() {
     }
   };
 
-  // 自动朗读最新的助手回复（仅在语音交流模式下启用）
+  // 流式 TTS：监听消息流式生成，实时拆分句子并生成音频
   useEffect(() => {
     if (interactionMode !== 'voice') return;
-    if (!isLoading && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role !== 'assistant') return;
-      if (lastMessage.id === lastSpokenMessageIdRef.current) return;
-      const content = getMessageContent(lastMessage);
-      if (!content?.trim()) return;
-      lastSpokenMessageIdRef.current = lastMessage.id;
-      handlePlayVoice(lastMessage.id, content);
+    if (messages.length === 0) return;
+    
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role !== 'assistant') return;
+    
+    const content = getMessageContent(lastMessage);
+    if (!content?.trim()) return;
+    
+    // 如果是新消息，重置累积文本
+    if (lastMessage.id !== currentStreamingMessageRef.current) {
+      currentStreamingMessageRef.current = lastMessage.id;
+      accumulatedTextRef.current = '';
+      audioQueueRef.current = [];
+      processedSentencesRef.current.clear();
+      ttsProcessedRef.current = false;
+    }
+    
+    // 更新累积文本
+    accumulatedTextRef.current = content;
+    
+    // 文字生成完毕时触发 TTS 处理（只处理一次）
+    if (!isLoading && content && !ttsProcessedRef.current) {
+      ttsProcessedRef.current = true;
+      handleStreamingText(lastMessage.id, '', true);
     }
   }, [messages, isLoading, interactionMode]);
 
@@ -532,8 +556,171 @@ export default function Home() {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    // 清空流式 TTS 队列
+    audioQueueRef.current = [];
+    isPlayingQueueRef.current = false;
+    currentStreamingMessageRef.current = null;
+    accumulatedTextRef.current = '';
+    processedSentencesRef.current.clear();
+    ttsProcessedRef.current = false;
   };
 
+  // 流式文本处理：简化版，只在文字生成完毕后一次性处理
+  const handleStreamingText = async (messageId: string, newText: string, isFinal: boolean) => {
+    // 只在最终完成时处理，避免流式拆分的复杂性
+    if (!isFinal) return;
+    
+    const buffer = accumulatedTextRef.current;
+    if (!buffer.trim()) return;
+    
+    // 按段落拆分（双换行或角色前缀）
+    const paragraphs: string[] = [];
+    const lines = buffer.split('\n');
+    let currentPara = '';
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (currentPara) {
+          paragraphs.push(currentPara.trim());
+          currentPara = '';
+        }
+        continue;
+      }
+      
+      // 检测角色前缀作为段落分隔
+      const roleMatch = trimmed.match(/^(ENFP|ENFJ|ENTJ|ISTJ|INFP|沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/);
+      if (roleMatch && currentPara) {
+        paragraphs.push(currentPara.trim());
+        currentPara = trimmed;
+      } else {
+        currentPara += (currentPara ? ' ' : '') + trimmed;
+      }
+    }
+    
+    if (currentPara) {
+      paragraphs.push(currentPara.trim());
+    }
+    
+    // 为每个段落生成 TTS（顺序执行，避免乱序）
+    for (const para of paragraphs) {
+      if (!para || para.length < 3) continue;
+      if (para.match(/^[-*#]+$/) || para === '---') continue; // 跳过分隔符
+      
+      if (!processedSentencesRef.current.has(para)) {
+        processedSentencesRef.current.add(para);
+        await generateTTSForSentence(messageId, para);
+      }
+    }
+    
+    // 启动队列播放器
+    if (!isPlayingQueueRef.current) {
+      playAudioQueue();
+    }
+  };
+  
+  // 为单个句子生成 TTS（异步并行）
+  const generateTTSForSentence = async (messageId: string, sentence: string) => {
+    if (!sentence.trim()) return;
+    
+    try {
+      let voice = ttsVoice;
+      let textToSpeak = sentence;
+      
+      // 游戏模式：检测角色前缀并切换声音
+      if (viewMode === 'game') {
+        const speakerMatch = sentence.match(/^(沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/);
+        if (speakerMatch) {
+          const speakerVoiceMap: Record<string, string> = {
+            '沈星回': 'shenxinghui',
+            '秦彻': 'qinche',
+            '祁煜': 'qiyu',
+            '黎深': 'lishen',
+            '夏以昼': 'xiayizhou',
+          };
+          voice = speakerVoiceMap[speakerMatch[1]] || 'shenxinghui';
+        }
+      } else {
+        // MBTI 模式：去掉角色前缀，统一用一个声音
+        textToSpeak = sentence.replace(/^(ENFP|ENFJ|ENTJ|ISTJ|INFP)[：:]/, '');
+      }
+      
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSpeak, voice }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '生成语音失败');
+      
+      const audioUrl = data.audioUrl as string;
+      
+      // 保存音频记录
+      try {
+        if (lastAssistantDbIdRef.current && audioUrl && supabaseClient) {
+          await supabaseClient.from('audio_records').insert({
+            message_id: lastAssistantDbIdRef.current,
+            type: 'tts',
+            url: audioUrl,
+          });
+        }
+      } catch (e) {
+        console.warn('save audio url failed:', (e as any)?.message);
+      }
+      
+      // 加入播放队列
+      audioQueueRef.current.push({ url: audioUrl, text: sentence });
+      
+      // 如果播放器空闲，立即启动
+      if (!isPlayingQueueRef.current) {
+        playAudioQueue();
+      }
+    } catch (err: any) {
+      console.error('TTS generation failed for sentence:', sentence, err);
+      setTtsError(err?.message || '生成语音失败');
+    }
+  };
+  
+  // 队列播放器：按顺序播放音频
+  const playAudioQueue = async () => {
+    if (isPlayingQueueRef.current) return;
+    isPlayingQueueRef.current = true;
+    
+    while (audioQueueRef.current.length > 0) {
+      const item = audioQueueRef.current.shift();
+      if (!item) break;
+      
+      try {
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+        }
+        
+        audioRef.current.src = item.url;
+        
+        // 等待播放完成
+        await new Promise<void>((resolve, reject) => {
+          if (!audioRef.current) return resolve();
+          
+          audioRef.current.onended = () => resolve();
+          audioRef.current.onerror = () => reject(new Error('播放失败'));
+          
+          audioRef.current.play().catch((err) => {
+            console.warn('Audio play failed:', err);
+            resolve(); // 失败也继续下一个
+          });
+        });
+        
+        // 句子间短暂停顿（300ms）
+        await new Promise(r => setTimeout(r, 300));
+      } catch (err) {
+        console.error('Audio playback error:', err);
+      }
+    }
+    
+    isPlayingQueueRef.current = false;
+  };
+  
   const handlePlayVoice = async (messageId: string, text: string) => {
     if (!text?.trim()) return;
     if (interactionMode !== 'voice') return;
