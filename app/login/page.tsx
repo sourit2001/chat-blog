@@ -16,15 +16,19 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      if (!supabaseClient) {
+        throw new Error('Supabase 未配置：请检查环境变量');
+      }
+      const client = supabaseClient;
       // 先尝试登录，不存在再注册
-      const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await client.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) {
         // 如果是用户不存在，尝试注册
-        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
+        const { data: signUpData, error: signUpError } = await client.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: undefined },
@@ -38,7 +42,7 @@ export default function LoginPage() {
             throw new Error('当前后台仍要求邮箱确认：请在 Supabase Auth → Providers → Email 关闭 Confirm email，并删除已创建的未确认用户后重试。');
           }
           // 如果已经确认（极少数场景），再尝试登录一次
-          const { error: signInAfterSignUpError } = await supabaseClient.auth.signInWithPassword({
+          const { error: signInAfterSignUpError } = await client.auth.signInWithPassword({
             email,
             password,
           });

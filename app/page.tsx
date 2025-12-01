@@ -454,10 +454,12 @@ export default function Home() {
   // Ensure a conversation exists for current user and view mode
   const ensureConversation = async () => {
     if (conversationId) return conversationId;
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!supabaseClient) return null;
+    const client = supabaseClient;
+    const { data: { user } } = await client.auth.getUser();
     if (!user) return null;
     // Try find latest conversation for this viewMode created today
-    const { data: found } = await supabaseClient
+    const { data: found } = await client
       .from('conversations')
       .select('id')
       .eq('user_id', user.id)
@@ -470,7 +472,7 @@ export default function Home() {
     }
     // Create new conversation
     const title = viewMode === 'game' ? '恋与深空会话' : 'MBTI 团队会话';
-    const { data: created, error } = await supabaseClient
+    const { data: created, error } = await client
       .from('conversations')
       .insert({ user_id: user.id, title, view_mode: viewMode })
       .select('id')
@@ -483,8 +485,9 @@ export default function Home() {
   const saveMessage = async (role: 'user' | 'assistant', content: string): Promise<string | null> => {
     try {
       const convId = await ensureConversation();
-      if (!convId) return null;
-      const { data, error } = await supabaseClient
+      if (!convId || !supabaseClient) return null;
+      const client = supabaseClient;
+      const { data, error } = await client
         .from('messages')
         .insert({ conversation_id: convId, role, content })
         .select('id')
@@ -566,7 +569,7 @@ export default function Home() {
           const src = data.audioUrl as string;
           // save audio record (tts) if we have assistant db id
           try {
-            if (lastAssistantDbIdRef.current && src) {
+            if (lastAssistantDbIdRef.current && src && supabaseClient) {
               await supabaseClient.from('audio_records').insert({
                 message_id: lastAssistantDbIdRef.current,
                 type: 'tts',
@@ -615,7 +618,7 @@ export default function Home() {
       const src = data.audioUrl as string;
       // save audio record (tts)
       try {
-        if (lastAssistantDbIdRef.current && src) {
+        if (lastAssistantDbIdRef.current && src && supabaseClient) {
           await supabaseClient.from('audio_records').insert({
             message_id: lastAssistantDbIdRef.current,
             type: 'tts',
