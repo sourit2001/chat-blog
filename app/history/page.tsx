@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

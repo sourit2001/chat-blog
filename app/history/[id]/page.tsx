@@ -5,6 +5,8 @@ import { supabaseClient } from "@/lib/supabaseClient";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export default function ConversationDetailPage() {
   const params = useParams();
   const id = params?.id as string;
