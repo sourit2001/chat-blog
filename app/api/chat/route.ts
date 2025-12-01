@@ -132,20 +132,12 @@ export async function POST(req: Request) {
             ? `${gameSystemPrompt}\n${gameGuardPrompt}` 
             : mbtiSystemPrompt;
 
-        // 20s timeout guard to avoid long hangs
-        const withTimeout = <T>(p: Promise<T>, ms = 20000) =>
-          new Promise<T>((resolve, reject) => {
-            const t = setTimeout(() => reject(new Error('Upstream timeout')), ms);
-            p.then(v => { clearTimeout(t); resolve(v); })
-             .catch(e => { clearTimeout(t); reject(e); });
-          });
-
-        const result = await withTimeout(streamText({
+        const result = streamText({
           model: google("gemini-3-pro-preview"),
           system: systemPrompt,
           messages: sanitizedMessages,
           maxOutputTokens: 512,
-        }));
+        });
 
         return (result as any).toUIMessageStreamResponse();
     } catch (error) {
