@@ -20,14 +20,20 @@ export default function ConversationDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+        if (!supabaseClient) {
+          setError('Supabase 未配置：请设置 NEXT_PUBLIC_SUPABASE_URL 与 NEXT_PUBLIC_SUPABASE_ANON_KEY');
+          setLoading(false);
+          return;
+        }
+        const client = supabaseClient;
+        const { data: { user }, error: userErr } = await client.auth.getUser();
         if (userErr) throw userErr;
         if (!user) {
           window.location.href = "/login";
           return;
         }
         // Load conversation
-        const { data: conv, error: convErr } = await supabaseClient
+        const { data: conv, error: convErr } = await client
           .from("conversations")
           .select("*")
           .eq("id", id)
@@ -37,7 +43,7 @@ export default function ConversationDetailPage() {
         setConversation(conv);
 
         // Load messages with audio records
-        const { data: msgs, error: msgsErr } = await supabaseClient
+        const { data: msgs, error: msgsErr } = await client
           .from("messages")
           .select(`
             id,
