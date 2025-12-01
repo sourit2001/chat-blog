@@ -804,6 +804,10 @@ export default function Home() {
         {/* Left: brand */}
         <div className="flex items-center gap-2">
           <Logo className="w-8 h-8" showText={true} />
+          {/* Mobile: current section badge */}
+          <span className="sm:hidden inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/80 text-emerald-800 border border-white/60">
+            {pathname?.startsWith('/lysk') ? '恋与深空' : 'MBTI'}
+          </span>
         </div>
 
         {/* Center: primary nav (desktop only) */}
@@ -832,7 +836,8 @@ export default function Home() {
 
         {/* Right: actions */}
         <div className="flex items-center gap-2">
-          <>
+          {/* Desktop quick actions */}
+          <div className="hidden sm:flex items-center gap-2">
             <button
               onClick={() => hasMessages && handleCopy()}
               className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'}`}
@@ -875,7 +880,7 @@ export default function Home() {
             >
               <Trash2 className="w-5 h-5" />
             </button>
-          </>
+          </div>
           {/* Login / User avatar */}
           {userEmail ? (
             <details className="relative">
@@ -913,9 +918,9 @@ export default function Home() {
             我的聊天
           </a>
           {/* Consolidated menu (all sizes) */}
-          <details className="relative">
-            <summary className="list-none inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/70 border border-white/60 shadow-sm cursor-pointer">
-              <Menu className="w-5 h-5 text-gray-700" />
+          <details className="relative z-50">
+            <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-200 shadow cursor-pointer">
+              <Menu className="w-5 h-5 text-gray-800" />
             </summary>
             <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white/95 shadow-lg border border-white/60 p-2 space-y-1">
               <a href="/mbti" className="block px-3 py-2 rounded-lg text-sm hover:bg-emerald-50">MBTI</a>
