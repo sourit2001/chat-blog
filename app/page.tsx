@@ -341,6 +341,30 @@ export default function Home() {
   const lastStoredMessageIdRef = useRef<string | null>(null);
   const lastAssistantDbIdRef = useRef<string | null>(null);
 
+  // Auth state for header
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const displayName = userEmail ? (userEmail.split('@')[0] || '已登录') : null;
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!supabaseClient) return;
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (mounted) setUserEmail(user?.email ?? null);
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      if (!supabaseClient) return;
+      await supabaseClient.auth.signOut();
+      setUserEmail(null);
+      window.location.href = '/login';
+    } catch {}
+  };
+
   const isLoading = status === 'submitted' || status === 'streaming';
   const hasMessages = messages.length > 0;
 
@@ -852,19 +876,34 @@ export default function Home() {
               <Trash2 className="w-5 h-5" />
             </button>
           </>
-          {/* Login / Register entry */}
-          <a
-            href="/login"
-            className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
-          >
-            登录 / 注册
-          </a>
-          <a
-            href="/login"
-            className="sm:hidden inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
-          >
-            登录
-          </a>
+          {/* Login / User avatar */}
+          {userEmail ? (
+            <details className="relative">
+              <summary className="list-none inline-flex items-center justify-center h-9 px-3 rounded-full bg-emerald-500 text-white text-sm font-medium shadow cursor-pointer">
+                {displayName || '已登录'}
+              </summary>
+              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white/95 shadow-lg border border-white/60 p-2 space-y-1">
+                <div className="px-3 py-1.5 text-[11px] text-gray-600 truncate">已登录：{userEmail}</div>
+                <a href="/history" className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50">我的聊天</a>
+                <button onClick={handleSignOut} className="w-full text-left block px-3 py-2 rounded-lg text-sm hover:bg-red-50 text-red-600">退出登录</button>
+              </div>
+            </details>
+          ) : (
+            <>
+              <a
+                href="/login"
+                className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+              >
+                登录 / 注册
+              </a>
+              <a
+                href="/login"
+                className="sm:hidden inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+              >
+                登录
+              </a>
+            </>
+          )}
           {/* History */}
           <a
             href="/history"
