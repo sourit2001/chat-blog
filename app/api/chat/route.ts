@@ -1,7 +1,8 @@
 import { google } from "@ai-sdk/google";
-import { streamText, generateText } from "ai";
+import { streamText } from "ai";
 
 export const runtime = 'edge';
+export const preferredRegion = 'hkg1';
 
 export async function POST(req: Request) {
     try {
@@ -16,13 +17,7 @@ export async function POST(req: Request) {
         
         const viewMode = queryViewMode || bodyViewMode || refererViewMode || 'mbti';
 
-        console.log("Received messages:", JSON.stringify(messages, null, 2));
-        console.log("Request body:", JSON.stringify(body, null, 2));
-        console.log("Referer:", referer);
-        console.log("Query viewMode:", queryViewMode);
-        console.log("Body viewMode:", bodyViewMode);
-        console.log("Referer viewMode:", refererViewMode);
-        console.log("Final viewMode:", viewMode);
+        // trimmed verbose logs to reduce edge latency
 
         // Convert UIMessages (with parts array) to CoreMessages (with content string)
         const coreMessages = messages.map((msg: any) => {
@@ -38,7 +33,7 @@ export async function POST(req: Request) {
             return msg;
         });
 
-        console.log("Converted to core messages:", JSON.stringify(coreMessages, null, 2));
+        // no-op
 
         // In game mode, keep only latest user message to avoid any MBTI-style prior bias
         let sanitizedMessages = coreMessages;
@@ -137,16 +132,22 @@ export async function POST(req: Request) {
             ? `${gameSystemPrompt}\n${gameGuardPrompt}` 
             : mbtiSystemPrompt;
 
-        const result = await streamText({
-            model: google("gemini-3-pro-preview"), 
-            system: systemPrompt,
-            messages: sanitizedMessages,
-            onFinish: ({ text }) => {
-                console.log('Full response:', text);
-            },
-        });
+        // 20s timeout guard to avoid long hangs
+        const withTimeout = <T>(p: Promise<T>, ms = 20000) =>
+          new Promise<T>((resolve, reject) => {
+            const t = setTimeout(() => reject(new Error('Upstream timeout')), ms);
+            p.then(v => { clearTimeout(t); resolve(v); })
+             .catch(e => { clearTimeout(t); reject(e); });
+          });
 
-        return result.toUIMessageStreamResponse();
+        const result = await withTimeout(streamText({
+          model: google("gemini-3-pro-preview"),
+          system: systemPrompt,
+          messages: sanitizedMessages,
+          maxOutputTokens: 512,
+        }));
+
+        return (result as any).toUIMessageStreamResponse();
     } catch (error) {
         console.error("API route error:", error);
         return new Response(JSON.stringify({ error: String(error) }), {

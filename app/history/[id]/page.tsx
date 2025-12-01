@@ -59,9 +59,22 @@ export default function ConversationDetailPage() {
             )
           `)
           .eq("conversation_id", id)
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
         if (msgsErr) throw msgsErr;
-        setMessages(msgs || []);
+        
+        // Manual sort to handle identical timestamps: User always comes before Assistant if times are equal
+        const sortedMsgs = (msgs || []).sort((a: any, b: any) => {
+          const tA = new Date(a.created_at).getTime();
+          const tB = new Date(b.created_at).getTime();
+          if (tA !== tB) return tA - tB;
+          // If times are equal, User should come first
+          if (a.role === 'user' && b.role === 'assistant') return -1;
+          if (a.role === 'assistant' && b.role === 'user') return 1;
+          return 0;
+        });
+
+        setMessages(sortedMsgs);
       } catch (e: any) {
         setError(e?.message || "加载失败");
       } finally {
@@ -92,26 +105,30 @@ export default function ConversationDetailPage() {
         <div className="space-y-4">
           {(() => {
             const pairs: any[] = [];
-            let i = 0;
-            while (i < messages.length) {
-              const msg = messages[i];
+            // Robust pairing: pair each assistant with the nearest preceding unpaired user
+            let pendingUser: any | null = null;
+            for (const msg of messages) {
               if (msg.role === 'user') {
-                // Find the next assistant message (if any)
-                let assistantMsg = null;
-                if (i + 1 < messages.length && messages[i + 1].role === 'assistant') {
-                  assistantMsg = messages[i + 1];
-                  i += 2; // Skip both user and assistant
+                // If there was an unpaired previous user, flush it as orphan
+                if (pendingUser) pairs.push({ user: pendingUser, assistant: null });
+                pendingUser = msg;
+              } else if (msg.role === 'assistant') {
+                if (pendingUser) {
+                  pairs.push({ user: pendingUser, assistant: msg });
+                  pendingUser = null; // consumed
                 } else {
-                  i += 1; // Only user, no assistant
+                  pairs.push({ user: null, assistant: msg });
                 }
-                pairs.push({ user: msg, assistant: assistantMsg });
               } else {
-                // Orphan assistant message
+                // Unknown role: flush if needed as separate card
                 pairs.push({ user: null, assistant: msg });
-                i += 1;
               }
             }
-            return pairs;
+            // Tail: if last user had no assistant
+            if (pendingUser) pairs.push({ user: pendingUser, assistant: null });
+
+            // Newest first
+            return pairs.reverse();
           })().map((pair, pairIdx) => (
             <div key={pairIdx} className="p-4 rounded-2xl bg-white/90 border border-emerald-100 shadow shadow-emerald-100/60 backdrop-blur-md space-y-3">
               {pair.user && (
