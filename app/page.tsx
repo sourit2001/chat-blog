@@ -627,7 +627,7 @@ export default function Home() {
       let voice = ttsVoice;
       let textToSpeak = sentence;
       
-      // 游戏模式：检测角色前缀并切换声音
+      // 游戏模式：检测角色前缀并切换声音，去掉前缀
       if (viewMode === 'game') {
         const speakerMatch = sentence.match(/^(沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/);
         if (speakerMatch) {
@@ -639,11 +639,11 @@ export default function Home() {
             '夏以昼': 'xiayizhou',
           };
           voice = speakerVoiceMap[speakerMatch[1]] || 'shenxinghui';
+          // 去掉角色前缀，只播报内容
+          textToSpeak = sentence.replace(/^(沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/, '');
         }
-      } else {
-        // MBTI 模式：去掉角色前缀，统一用一个声音
-        textToSpeak = sentence.replace(/^(ENFP|ENFJ|ENTJ|ISTJ|INFP)[：:]/, '');
       }
+      // MBTI 模式：保留角色前缀，统一用一个声音
       
       const res = await fetch('/api/tts', {
         method: 'POST',
