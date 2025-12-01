@@ -8,6 +8,7 @@ import { useChat } from "@ai-sdk/react";
 import AudioVisualizer from "@/components/AudioVisualizer";
 import ReactMarkdown from "react-markdown";
 import { supabaseClient } from "@/lib/supabaseClient";
+import { Logo } from "@/components/Logo";
 
 type ParsedMbtiReply = {
   intro: string;
@@ -777,12 +778,7 @@ export default function Home() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-white/40 bg-white/60 backdrop-blur-xl z-10 shadow-sm rounded-b-3xl">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo} flex items-center justify-center`}>
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <h1 className="font-semibold text-lg tracking-tight">IdeaFlow</h1>
-          </div>
+          <Logo className="w-8 h-8" />
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center gap-2 text-sm">
             <a 

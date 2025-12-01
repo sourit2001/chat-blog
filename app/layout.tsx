@@ -5,13 +5,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "IdeaFlow Blog",
-  description: "Turn your ideas into blogs with AI",
+  title: "Chat2Blog",
+  description: "Turn your chats into blogs with AI",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "IdeaFlow",
+    title: "Chat2Blog",
   },
 };
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 
 export const dynamic = 'force-dynamic';
 
@@ -48,8 +49,11 @@ export default function HistoryPage() {
     <main className="relative flex flex-col min-h-screen overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-emerald-50 via-teal-50 to-lime-50" />
       <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-emerald-950 mb-2">我的聊天</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Logo className="w-8 h-8" showText={false} />
+            <h1 className="text-2xl font-semibold text-emerald-950">我的聊天</h1>
+          </div>
           <Link href="/" className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline">← 返回主页</Link>
         </div>
         {loading && <p className="text-sm text-emerald-700">加载中...</p>}

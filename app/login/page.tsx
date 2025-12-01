@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,7 +63,9 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-purple-50 to-pink-50">
       <div className="w-full max-w-sm bg-white/90 shadow-xl rounded-2xl p-6 border border-gray-100">
-        <h1 className="text-lg font-semibold text-gray-900 mb-1 text-center">登录 / 注册</h1>
+        <div className="flex justify-center mb-4">
+          <Logo className="w-10 h-10" />
+        </div>
         <p className="text-xs text-gray-500 mb-4 text-center">使用邮箱和密码登录，首次输入会自动注册账号</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 
 export const dynamic = 'force-dynamic';
 
@@ -74,7 +75,8 @@ export default function ConversationDetailPage() {
     <main className="relative flex flex-col min-h-screen overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-emerald-50 via-teal-50 to-lime-50" />
       <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
+          <Logo className="w-8 h-8" showText={false} />
           <Link href="/history" className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline">← 返回列表</Link>
         </div>
         {loading && <p className="text-sm text-emerald-700">加载中...</p>}
