@@ -305,9 +305,11 @@ export default function Home() {
     }
   }, [fixedMode]);
   const chatMbti = useChat({
+    id: 'mbti-session',
     onError: (err) => console.error("Chat error:", err),
   });
   const chatGame = useChat({
+    id: 'game-session',
     onError: (err) => console.error("Chat error:", err),
   });
   const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
@@ -481,7 +483,7 @@ export default function Home() {
   const saveMessage = async (role: 'user' | 'assistant', content: string): Promise<string | null> => {
     try {
       const convId = await ensureConversation();
-      if (!convId) return;
+      if (!convId) return null;
       const { data, error } = await supabaseClient
         .from('messages')
         .insert({ conversation_id: convId, role, content })

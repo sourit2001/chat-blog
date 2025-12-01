@@ -80,18 +80,29 @@ export default function ConversationDetailPage() {
           </div>
         )}
         <div className="space-y-4">
-          {messages.reduce((acc: any[], msg, idx) => {
-            if (msg.role === 'user') {
-              // Start a new conversation pair
-              const nextMsg = messages[idx + 1];
-              const pair = { user: msg, assistant: nextMsg?.role === 'assistant' ? nextMsg : null };
-              acc.push(pair);
-            } else if (idx === 0 || messages[idx - 1]?.role !== 'user') {
-              // Orphan assistant message (no preceding user message)
-              acc.push({ user: null, assistant: msg });
+          {(() => {
+            const pairs: any[] = [];
+            let i = 0;
+            while (i < messages.length) {
+              const msg = messages[i];
+              if (msg.role === 'user') {
+                // Find the next assistant message (if any)
+                let assistantMsg = null;
+                if (i + 1 < messages.length && messages[i + 1].role === 'assistant') {
+                  assistantMsg = messages[i + 1];
+                  i += 2; // Skip both user and assistant
+                } else {
+                  i += 1; // Only user, no assistant
+                }
+                pairs.push({ user: msg, assistant: assistantMsg });
+              } else {
+                // Orphan assistant message
+                pairs.push({ user: null, assistant: msg });
+                i += 1;
+              }
             }
-            return acc;
-          }, []).map((pair, pairIdx) => (
+            return pairs;
+          })().map((pair, pairIdx) => (
             <div key={pairIdx} className="p-4 rounded-2xl bg-white/90 border border-emerald-100 shadow shadow-emerald-100/60 backdrop-blur-md space-y-3">
               {pair.user && (
                 <div>
