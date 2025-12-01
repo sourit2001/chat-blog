@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import AudioVisualizer from "@/components/AudioVisualizer";
 import ReactMarkdown from "react-markdown";
+import { supabaseClient } from "@/lib/supabaseClient";
 
 type ParsedMbtiReply = {
   intro: string;
@@ -14,6 +15,7 @@ type ParsedMbtiReply = {
 };
 
 type ViewMode = 'mbti' | 'game';
+type InteractionMode = 'text' | 'voice';
 
 const allMbtiRoles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
 
@@ -330,6 +332,11 @@ export default function Home() {
   const [ttsError, setTtsError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [ttsVoice, setTtsVoice] = useState<'female' | 'male' | 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'>(viewMode === 'game' ? 'male' : 'female');
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('text');
+  // Conversation storage
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const lastStoredMessageIdRef = useRef<string | null>(null);
+  const lastAssistantDbIdRef = useRef<string | null>(null);
 
   const isLoading = status === 'submitted' || status === 'streaming';
   const hasMessages = messages.length > 0;
@@ -412,8 +419,9 @@ export default function Home() {
     }
   };
 
-  // 自动朗读最新的助手回复（使用 Gemini 语音）
+  // 自动朗读最新的助手回复（仅在语音交流模式下启用）
   useEffect(() => {
+    if (interactionMode !== 'voice') return;
     if (!isLoading && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role !== 'assistant') return;
@@ -423,7 +431,69 @@ export default function Home() {
       lastSpokenMessageIdRef.current = lastMessage.id;
       handlePlayVoice(lastMessage.id, content);
     }
+  }, [messages, isLoading, interactionMode]);
+
+  // Save assistant messages to database (independent of voice mode)
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role !== 'assistant') return;
+      if (lastMessage.id === lastStoredMessageIdRef.current) return;
+      const content = getMessageContent(lastMessage);
+      if (!content?.trim()) return;
+      lastStoredMessageIdRef.current = lastMessage.id;
+      // Save assistant message and store its DB id for audio linking
+      saveMessage('assistant', content).then((id) => {
+        if (id) lastAssistantDbIdRef.current = id;
+      });
+    }
   }, [messages, isLoading]);
+
+  // Ensure a conversation exists for current user and view mode
+  const ensureConversation = async () => {
+    if (conversationId) return conversationId;
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return null;
+    // Try find latest conversation for this viewMode created today
+    const { data: found } = await supabaseClient
+      .from('conversations')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('view_mode', viewMode)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (found && found.length > 0) {
+      setConversationId(found[0].id);
+      return found[0].id as string;
+    }
+    // Create new conversation
+    const title = viewMode === 'game' ? '恋与深空会话' : 'MBTI 团队会话';
+    const { data: created, error } = await supabaseClient
+      .from('conversations')
+      .insert({ user_id: user.id, title, view_mode: viewMode })
+      .select('id')
+      .single();
+    if (error) return null;
+    setConversationId(created.id);
+    return created.id as string;
+  };
+
+  const saveMessage = async (role: 'user' | 'assistant', content: string): Promise<string | null> => {
+    try {
+      const convId = await ensureConversation();
+      if (!convId) return;
+      const { data, error } = await supabaseClient
+        .from('messages')
+        .insert({ conversation_id: convId, role, content })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data?.id ?? null;
+    } catch (e) {
+      console.warn('saveMessage skipped:', (e as any)?.message);
+      return null;
+    }
+  };
 
   const clearChat = () => {
     setMessagesActive([]);
@@ -436,6 +506,7 @@ export default function Home() {
 
   const handlePlayVoice = async (messageId: string, text: string) => {
     if (!text?.trim()) return;
+    if (interactionMode !== 'voice') return;
 
     // 在游戏模式下，优先按角色前缀拆分多段语音，并为每段选择对应男主的声音
     if (viewMode === 'game') {
@@ -491,6 +562,18 @@ export default function Home() {
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || '生成语音失败');
           const src = data.audioUrl as string;
+          // save audio record (tts) if we have assistant db id
+          try {
+            if (lastAssistantDbIdRef.current && src) {
+              await supabaseClient.from('audio_records').insert({
+                message_id: lastAssistantDbIdRef.current,
+                type: 'tts',
+                url: src,
+              });
+            }
+          } catch (e) {
+            console.warn('save audio url failed:', (e as any)?.message);
+          }
           if (!audioRef.current) {
             audioRef.current = new Audio();
           } else {
@@ -528,6 +611,18 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '生成语音失败');
       const src = data.audioUrl as string;
+      // save audio record (tts)
+      try {
+        if (lastAssistantDbIdRef.current && src) {
+          await supabaseClient.from('audio_records').insert({
+            message_id: lastAssistantDbIdRef.current,
+            type: 'tts',
+            url: src,
+          });
+        }
+      } catch (e) {
+        console.warn('save audio url failed:', (e as any)?.message);
+      }
       if (!audioRef.current) {
         audioRef.current = new Audio();
       } else {
@@ -553,6 +648,8 @@ export default function Home() {
 
     try {
       await sendMessageActive({ role: 'user', content } as any);
+      // store user message
+      await saveMessage('user', content);
     } catch (err) {
       console.error("Failed to send message:", err);
     }
@@ -625,8 +722,13 @@ export default function Home() {
   };
 
   useEffect(() => {
-    setupRecognition();
-  }, [viewMode]);
+    if (interactionMode === 'voice') {
+      setupRecognition();
+    } else {
+      stopRecording();
+      setSttError(null);
+    }
+  }, [viewMode, interactionMode]);
 
   const startRecording = async () => {
     try {
@@ -768,6 +870,42 @@ export default function Home() {
               <Trash2 className="w-5 h-5" />
             </button>
           </>
+          {/* Login / Register entry */}
+          <a
+            href="/login"
+            className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+          >
+            登录 / 注册
+          </a>
+          <a
+            href="/login"
+            className="sm:hidden inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+          >
+            登录
+          </a>
+          {/* Interaction mode toggle: text / voice */}
+          <a
+            href="/history"
+            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+            title="我的聊天"
+          >
+            我的聊天
+          </a>
+          {/* Interaction mode toggle: text / voice */}
+          <div className="hidden sm:flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-xs">
+            <button
+              onClick={() => setInteractionMode('text')}
+              className={`px-2 py-1 rounded-full transition ${interactionMode==='text' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              文字
+            </button>
+            <button
+              onClick={() => setInteractionMode('voice')}
+              className={`px-2 py-1 rounded-full transition ${interactionMode==='voice' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              语音
+            </button>
+          </div>
           <div className="hidden sm:flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner">
             <button onClick={() => setTheme('green')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='green' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌿</button>
             <button onClick={() => setTheme('lavender')} className={`px-3 py-1 text-xs rounded-full transition ${theme==='lavender' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>💜</button>
@@ -779,6 +917,21 @@ export default function Home() {
             <button onClick={() => setTheme('lavender')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='lavender' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>💜</button>
             <button onClick={() => setTheme('pink')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='pink' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌸</button>
             <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full transition ${theme==='butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
+          </div>
+          {/* Mobile interaction mode toggle */}
+          <div className="flex sm:hidden items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-[11px]">
+            <button
+              onClick={() => setInteractionMode('text')}
+              className={`px-2 py-0.5 rounded-full transition ${interactionMode==='text' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              文
+            </button>
+            <button
+              onClick={() => setInteractionMode('voice')}
+              className={`px-2 py-0.5 rounded-full transition ${interactionMode==='voice' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}
+            >
+              语
+            </button>
           </div>
           {!fixedMode && (
           <div className="hidden sm:flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-xs">
@@ -896,7 +1049,8 @@ export default function Home() {
 
       {/* Input Area */}
       <div className="p-4 bg-white/60 backdrop-blur-2xl border-t border-white/40 shadow-inner">
-        {sttError && (
+        {/* STT 提示和波形只在语音模式下显示 */}
+        {interactionMode === 'voice' && sttError && (
           <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md p-2 flex items-center justify-between">
             <span>{sttError}</span>
             <div className="flex items-center gap-2">
@@ -907,7 +1061,7 @@ export default function Home() {
         )}
         {/* Voice Visualizer */}
         <AnimatePresence>
-          {isRecording && (
+          {interactionMode === 'voice' && isRecording && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 80, opacity: 1 }}
@@ -931,21 +1085,23 @@ export default function Home() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type or speak..."
+              placeholder={interactionMode === 'voice' ? "Type or speak..." : "请输入内容..."}
               className={`flex-1 bg-transparent border-none outline-none py-3 min-h-[44px] ${themes[theme].text}`}
             />
-            <button
-              type="button"
-              onClick={toggleRecording}
-              className={`p-2 rounded-2xl transition-all ${isRecording ? "text-red-600 bg-red-100" : `${themes[theme].textSub} hover:bg-black/5`}`}
-            >
-              <Mic className="w-5 h-5" />
-            </button>
+            {interactionMode === 'voice' && (
+              <button
+                type="button"
+                onClick={toggleRecording}
+                className={`p-2 rounded-2xl transition-all ${isRecording ? "text-red-600 bg-red-100" : `${themes[theme].textSub} hover:bg-black/5`}`}
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+            )}
           </div>
           <button
             type="submit"
             className={`p-3 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${themes[theme].button}`}
-            disabled={!inputValue && !isRecording}
+            disabled={!inputValue && !(interactionMode === 'voice' && isRecording)}
           >
             <Send className="w-5 h-5" />
           </button>
