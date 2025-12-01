@@ -1,8 +1,7 @@
 import { google } from "@ai-sdk/google";
-import { streamText } from "ai";
+import { streamText, generateText } from "ai";
 
 export const runtime = 'edge';
-export const preferredRegion = 'hkg1';
 
 export async function POST(req: Request) {
     try {
@@ -17,7 +16,13 @@ export async function POST(req: Request) {
         
         const viewMode = queryViewMode || bodyViewMode || refererViewMode || 'mbti';
 
-        // trimmed verbose logs to reduce edge latency
+        console.log("Received messages:", JSON.stringify(messages, null, 2));
+        console.log("Request body:", JSON.stringify(body, null, 2));
+        console.log("Referer:", referer);
+        console.log("Query viewMode:", queryViewMode);
+        console.log("Body viewMode:", bodyViewMode);
+        console.log("Referer viewMode:", refererViewMode);
+        console.log("Final viewMode:", viewMode);
 
         // Convert UIMessages (with parts array) to CoreMessages (with content string)
         const coreMessages = messages.map((msg: any) => {
@@ -33,7 +38,7 @@ export async function POST(req: Request) {
             return msg;
         });
 
-        // no-op
+        console.log("Converted to core messages:", JSON.stringify(coreMessages, null, 2));
 
         // In game mode, keep only latest user message to avoid any MBTI-style prior bias
         let sanitizedMessages = coreMessages;
@@ -132,14 +137,16 @@ export async function POST(req: Request) {
             ? `${gameSystemPrompt}\n${gameGuardPrompt}` 
             : mbtiSystemPrompt;
 
-        const result = streamText({
-          model: google("gemini-3-pro-preview"),
-          system: systemPrompt,
-          messages: sanitizedMessages,
-          maxOutputTokens: 512,
+        const result = await streamText({
+            model: google("gemini-3-pro-preview"), 
+            system: systemPrompt,
+            messages: sanitizedMessages,
+            onFinish: ({ text }) => {
+                console.log('Full response:', text);
+            },
         });
 
-        return (result as any).toUIMessageStreamResponse();
+        return result.toUIMessageStreamResponse();
     } catch (error) {
         console.error("API route error:", error);
         return new Response(JSON.stringify({ error: String(error) }), {
