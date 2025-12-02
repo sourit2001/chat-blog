@@ -138,7 +138,7 @@ export async function POST(req: Request) {
             : mbtiSystemPrompt;
 
         const result = await streamText({
-            model: google("gemini-3-pro-preview"), 
+            model: google("gemini-2.5-flash"), 
             system: systemPrompt,
             messages: sanitizedMessages,
             onFinish: ({ text }) => {
