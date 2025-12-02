@@ -631,7 +631,7 @@ export default function Home() {
       if (viewMode === 'game') {
         const speakerMatch = sentence.match(/^(沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/);
         if (speakerMatch) {
-          const speakerVoiceMap: Record<string, string> = {
+          const speakerVoiceMap: Record<string, 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'> = {
             '沈星回': 'shenxinghui',
             '秦彻': 'qinche',
             '祁煜': 'qiyu',
