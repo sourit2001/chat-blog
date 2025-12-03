@@ -311,12 +311,12 @@ export default function Home() {
   const chatMbti = useChat({
     id: 'mbti-session',
     body: { viewMode: 'mbti' },
-    onError: (err) => console.error("Chat error:", err),
+    onError: (err: unknown) => console.error("Chat error:", err),
   } as any);
   const chatGame = useChat({
     id: 'game-session',
     body: { viewMode: 'game', selectedRoles },
-    onError: (err) => console.error("Chat error:", err),
+    onError: (err: unknown) => console.error("Chat error:", err),
   } as any);
   const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
   const status = viewMode === 'mbti' ? chatMbti.status : chatGame.status;
