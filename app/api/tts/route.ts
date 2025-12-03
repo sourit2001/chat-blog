@@ -8,7 +8,7 @@ const voicePresets: Record<string, string> = {
   female: "Chinese (Mandarin)_Sweet_Lady",
   male: "Chinese (Mandarin)_Gentleman",
   // 恋与深空男主专属声音（均为男性音色）：
-  shenxinghui: "Chinese (Mandarin)_Gentle_Youth",          // 沈星回：温柔青年
+  shenxinghui: "R8_06O5P5Z3",                               // 沈星回：指定自定义 Voice ID
   qinche: "Chinese (Mandarin)_Reliable_Executive",         // 秦彻：可靠高管（成熟低沉）
   qiyu: "Chinese (Mandarin)_Straightforward_Boy",          // 祁煜：直率少年（活泼直接）
   lishen: "Chinese (Mandarin)_Gentleman",                  // 黎深：绅士温和男声

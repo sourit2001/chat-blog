@@ -305,12 +305,17 @@ export default function Home() {
       setTtsVoice(fixedMode === 'game' ? 'male' : 'female');
     }
   }, [fixedMode]);
+  // Game mode: selectable chat members (default all 5)
+  const allGameRoles = ['沈星回','黎深','祁煜','夏以昼','秦彻'] as const;
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([...allGameRoles]);
   const chatMbti = useChat({
     id: 'mbti-session',
+    body: { viewMode: 'mbti' },
     onError: (err) => console.error("Chat error:", err),
   });
   const chatGame = useChat({
     id: 'game-session',
+    body: { viewMode: 'game', selectedRoles },
     onError: (err) => console.error("Chat error:", err),
   });
   const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
@@ -1053,11 +1058,20 @@ export default function Home() {
                   setBlogLoading(false);
                 }
               }}
-              className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'} disabled:opacity-50`}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors shadow ${
+                hasMessages
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                  : 'bg-gray-300 text-white cursor-not-allowed'
+              } disabled:opacity-70`}
               title="生成博客"
               disabled={!hasMessages || blogLoading}
             >
-              <FileText className="w-5 h-5" />
+              {blogLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              <span>生成博客</span>
             </button>
             <button
               onClick={() => hasMessages && clearChat()}
@@ -1068,6 +1082,20 @@ export default function Home() {
               <Trash2 className="w-5 h-5" />
             </button>
           </div>
+          {/* Interaction mode toggle (visible) */}
+          <button
+            onClick={() => setInteractionMode(interactionMode === 'voice' ? 'text' : 'voice')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+            title={interactionMode === 'voice' ? '切换为文字模式' : '切换为语音模式'}
+          >
+            {interactionMode === 'voice' ? (
+              <Volume2 className="w-4 h-4" />
+            ) : (
+              <Mic className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">{interactionMode === 'voice' ? '语音' : '文字'}</span>
+          </button>
+
           {/* Login / User avatar */}
           {userEmail ? (
             <details className="relative">
@@ -1118,30 +1146,91 @@ export default function Home() {
                 <>
                   <div className="h-px bg-gray-100 my-1" />
                   <div className="px-2 py-1 text-[11px] text-gray-500">视图</div>
-                  <div className="flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-xs">
-                    <button onClick={() => setViewMode('mbti')} className={`px-2 py-1 rounded-full ${viewMode==='mbti' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}>MBTI</button>
-                    <button onClick={() => setViewMode('game')} className={`px-2 py-1 rounded-full ${viewMode==='game' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}>恋与深空</button>
+                  <button onClick={() => setViewMode('mbti')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode==='mbti'?'bg-emerald-50 text-emerald-700':'hover:bg-gray-50'}`}>MBTI</button>
+                  <button onClick={() => setViewMode('game')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode==='game'?'bg-purple-50 text-purple-700':'hover:bg-gray-50'}`}>恋与深空</button>
+                  <div className="h-px bg-gray-100 my-1" />
+                  <div className="px-2 py-1 text-[11px] text-gray-500">交互模式</div>
+                  <button onClick={() => setInteractionMode('text')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode==='text'?'bg-gray-100 text-gray-800':'hover:bg-gray-50'}`}>文字</button>
+                  <button onClick={() => setInteractionMode('voice')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode==='voice'?'bg-gray-100 text-gray-800':'hover:bg-gray-50'}`}>语音</button>
+                </>
+              )}
+              {viewMode==='game' && (
+                <>
+                  <div className="h-px bg-gray-100 my-1" />
+                  <div className="px-2 py-1 text-[11px] text-gray-500">聊天人选（最多5人）</div>
+                  <div className="px-2 py-1 space-y-1">
+                    {allGameRoles.map((r) => {
+                      const checked = selectedRoles.includes(r);
+                      return (
+                        <label key={r} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setSelectedRoles((prev) => {
+                                if (e.target.checked) {
+                                  const next = [...new Set([...prev, r])];
+                                  return next.slice(0, 5);
+                                } else {
+                                  return prev.filter(x => x !== r);
+                                }
+                              });
+                            }}
+                            className="h-3.5 w-3.5 rounded border-gray-300"
+                          />
+                          <span>{r}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </>
               )}
-              <div className="h-px bg-gray-100 my-1" />
-              <div className="px-2 py-1 text-[11px] text-gray-500">交互模式</div>
-              <div className="flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner text-xs">
-                <button onClick={() => setInteractionMode('text')} className={`px-2 py-1 rounded-full ${interactionMode==='text' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}>文字</button>
-                <button onClick={() => setInteractionMode('voice')} className={`px-2 py-1 rounded-full ${interactionMode==='voice' ? 'bg-white shadow font-medium text-gray-900' : 'hover:bg-white/70 text-gray-600'}`}>语音</button>
-              </div>
               <div className="h-px bg-gray-100 my-1" />
               <div className="px-2 py-1 text-[11px] text-gray-500">主题</div>
               <div className="flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner">
                 <button onClick={() => setTheme('green')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme==='green' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌿</button>
                 <button onClick={() => setTheme('lavender')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme==='lavender' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>💜</button>
                 <button onClick={() => setTheme('pink')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme==='pink' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌸</button>
-                <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme==='butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
+              <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme==='butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
               </div>
             </div>
           </details>
         </div>
       </header>
+      {viewMode==='game' && (
+        <div className="px-4 py-2 bg-white/80 backdrop-blur border-b border-gray-200">
+          <div className="flex items-center justify-between max-w-5xl mx-auto">
+            <div className="flex gap-2 flex-wrap">
+              {allGameRoles.map((r) => {
+                const active = selectedRoles.includes(r);
+                return (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setSelectedRoles((prev) => {
+                        return active
+                          ? prev.filter((x) => x !== r)
+                          : [...new Set([...prev, r])].slice(0, 5);
+                      });
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm border ${
+                      active
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setSelectedRoles([...allGameRoles])} className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200">全选</button>
+              <button onClick={() => setSelectedRoles([])} className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200">清空</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
@@ -1187,16 +1276,16 @@ export default function Home() {
 
       {/* Blog Preview Panel */}
       {blogDraft && (
-        <div className="border-t border-white/10 bg-black/70 backdrop-blur-xl p-4">
+        <div className="border border-gray-200 bg-white shadow-xl p-4 rounded-xl">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-gray-300">
-              <FileText className="w-4 h-4" />
-              <span className="text-sm">博客草稿预览</span>
+            <div className="flex items-center gap-2 text-gray-800">
+              <FileText className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium">博客草稿预览</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setBlogDraft(null)}
-                className="px-2 py-1 text-xs rounded-md bg-white/10 hover:bg-white/15"
+                className="px-2 py-1 text-xs rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
               >关闭</button>
               <button
                 onClick={() => {
@@ -1209,13 +1298,28 @@ export default function Home() {
                   a.click();
                   URL.revokeObjectURL(url);
                 }}
-                className="px-2 py-1 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 flex items-center gap-1"
+                className="px-2 py-1 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1"
               >
                 <Download className="w-3 h-3" /> 下载 .md
               </button>
+              <button
+                onClick={() => {
+                  const blob = new Blob([blogDraft.markdown], { type: 'text/plain;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  const safeTitle = (blogDraft.title || 'draft').replace(/[^\w\-]+/g, '-');
+                  a.href = url;
+                  a.download = `${safeTitle}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> 下载 .txt
+              </button>
             </div>
           </div>
-          <div className="prose prose-invert max-w-none text-sm">
+          <div className="prose max-w-none text-[15px] prose-neutral text-gray-900 max-h-[60vh] overflow-auto pr-1">
             <ReactMarkdown>{blogDraft.markdown}</ReactMarkdown>
           </div>
         </div>
