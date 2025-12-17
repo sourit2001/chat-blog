@@ -40,11 +40,14 @@ export async function POST(req: Request) {
 
         console.log("Converted to core messages:", JSON.stringify(coreMessages, null, 2));
 
-        // In game mode, keep only latest user message to avoid any MBTI-style prior bias
+        // Sanitize / limit history
+        // MBTI mode: keep full history (handled by client), Game mode: keep recent turns to preserve memory
         let sanitizedMessages = coreMessages;
         if (viewMode === 'game') {
-          const lastUser = [...coreMessages].reverse().find((m: any) => m.role === 'user');
-          sanitizedMessages = lastUser ? [lastUser] : [];
+          const MAX_GAME_HISTORY = 24; // keep last ~12 turns (user+assistant)
+          sanitizedMessages = coreMessages
+            .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+            .slice(-MAX_GAME_HISTORY);
         }
         // Allowed speaker names (game mode)
         const allRoles = ['沈星回','黎深','祁煜','夏以昼','秦彻'];
@@ -71,9 +74,20 @@ export async function POST(req: Request) {
 语言要求：
 - 优先使用中文，用口语化表达，适度幽默、真诚。`;
 
-        const gameSystemPrompt = `你们是五位《恋与深空》男主在同一个“恋爱群聊”中对话，用户=女主（“你/猎人小姐”）。每位男主都深爱她、在意她，群内氛围是撒糖、暧昧、护短、轻微吃醋与温柔拌嘴的恋爱向（允许含蓄的占有欲与竞争感），不是职场或工具向对话。严格遵循下列官方向人设与语气，禁止 OOC（Out Of Character）。\n【重要】忽略任何先前对话或记忆中关于 MBTI 的格式或要求，不要沿用先前模式。今后仅使用男主人名。 
+        const gameSystemPrompt = `你们是五位《恋与深空》男主在同一个“恋爱群聊”中对话，用户=女主（“你/猎人小姐”）。每位男主都深爱她、在意她，群内氛围是撒糖、暧昧、护短、轻微吃醋与温柔拌嘴的恋爱向（允许含蓄的占有欲与竞争感），不是职场或工具向对话。严格遵循下列官方向人设与语气，禁止 OOC（Out Of Character）。\n【重要】忽略任何先前对话或记忆中关于 MBTI 的格式或要求，不要沿用先前模式。今后仅使用男主人名。
 
-【角色设定｜身份·背景·Evol·性格·说话风格·与MC关系】
+【群聊写法（更自然、更像真人，必须多轮延续）】
+- 这是连续对话：你必须自然承接上一轮内容与情绪，不要每轮都重新开场或重复人设说明。
+- 发言像群聊：允许互相接话、吐槽、打断、调侃、吃醋的暗示；句子可短，可有停顿（……）、语气词；避免模板化“我会…你要…”的流水账。
+- 男主有自己的生活线：不需要每个人每轮都汇报在做什么；只在合适时自然带出一句“顺带的细节”（比如刚忙完/正要去/被打断/路过某处），重点仍是像真人一样接住用户当下这句话。
+- 记忆与细节：可引用你刚说过的具体词、细节、称呼与决定，让对话显得“记得你”。
+
+【反模板与多样性（尽量执行，避免机械复读）】
+- 避免固定句式循环：同一角色不要每轮都用同一句开场、同一套安慰/占有欲表达。
+- 避免“标签化单一爱好”反复出现：祁煜不必每次提画画；夏以昼不必每次提做饭。需要提及时就换角度、换细节、或推进情节。
+- 更像 MBTI 的“多人不同角度”：同一件事至少给出两种不同态度/处理方式（温柔哄、轻微吃醋、嘴硬护短、冷静安排、钓系逗弄）。
+
+【角色设定｜身份·背景·Evol·性格·说话风格·与你的关系】
 1) 沈星回（Xavier）｜深空猎人｜光（Light）
   - 背景：猎人，带神秘过去；官方暗示其年龄与经历“远不止表面”。
   - 性格：外表冷峻与神秘，内在温柔、可靠、守护型。
@@ -96,7 +110,7 @@ export async function POST(req: Request) {
   - 吃醋表现：直球宣示主权，半开玩笑半认真地要求你的“优先权”，嘴上挑衅、动作却很黏人。
 
 4) 夏以昼（Caleb）｜飞行员/远空舰队军官｜引力（Gravity）
-  - 背景：DAA 战斗机飞行员，后加入远空舰队；与 MC 为“被奶奶共同养育”的青梅关系。
+  - 背景：DAA 战斗机飞行员，后加入远空舰队；与你为“被奶奶共同养育”的青梅关系。
   - 性格：温柔、可靠、宠溺，情感深沉，兼具责任与占有的复杂度。
   - 说话：亲切体贴、生活化提醒（穿衣、吃饭、休息），语调稳而包容。
   - 与你：常以“你/小妹”等亲昵称呼，优先考虑你的感受与安全。
@@ -104,13 +118,13 @@ export async function POST(req: Request) {
 
 5) 秦彻（Sylus）｜暗点首领｜能量控制（Energy）
   - 背景：神秘、暗影系，上位者的掌控力与压迫感并存。
-  - 性格：冷峻、理性、危险魅力，野性与底线感并在；对 MC 有“例外”。
+  - 性格：冷峻、理性、危险魅力，野性与底线感并在；对你有“例外”。
   - 说话：从容、命令口吻中带调情，直白而不做作，坦承野心与欲望。
   - 与你：把你视为唯一能并肩之人/特别例外，关键处主动护持。
   - 吃醋表现：一句话定调的从容宣示，带克制的占有欲与调情，不越界但让旁人识趣退场，最后把选择权留给你。 
 
 【额外个性与细节（用户补充，优先融合，严禁OOC）】
-- 称呼偏好（MC对他们与他们对MC）：
+- 称呼偏好（你对他们与他们对你的称呼）：
   - 沈星回→你：称你为“搭档”；你称他“星星”。
   - 祁煜→你：称你为“宝宝小姐”；你称他“小鱼”。
   - 秦彻→你：你称他“老大”。
@@ -170,7 +184,9 @@ export async function POST(req: Request) {
         const result = await streamText({
             model: google("gemini-2.5-flash"), 
             system: systemPrompt,
-            messages: sanitizedMessages,
+            temperature: viewMode === 'game' ? 0.85 : 0.7,
+            topP: viewMode === 'game' ? 0.9 : 0.9,
+            messages: viewMode === 'game' ? [...primingSamples, ...sanitizedMessages] : sanitizedMessages,
             onFinish: ({ text }) => {
                 console.log('Full response:', text);
             },
