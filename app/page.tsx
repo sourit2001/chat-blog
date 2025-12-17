@@ -320,6 +320,8 @@ export default function Home() {
   // Game mode: selectable chat members (default all 5)
   const allGameRoles = ['沈星回','黎深','祁煜','夏以昼','秦彻'] as const;
   const [selectedRoles, setSelectedRoles] = useState<string[]>([...allGameRoles]);
+  const [messageSelectedRoles, setMessageSelectedRoles] = useState<Record<string, string[]>>({});
+  const selectedRolesQueueRef = useRef<string[][]>([]);
   const userProfileStorageKey = 'chat_user_profile_v2';
   const legacyUserProfileStorageKey = 'chat_user_profile_v1';
   type UserPersona = {
@@ -479,8 +481,8 @@ export default function Home() {
 
   const withMetaBlocks = (text: string) => withRolesBlock(withPersonaBlock(text));
 
-  const filterGameReplyBySelectedRoles = (text: string) => {
-    const allowed = Array.isArray(selectedRoles) ? selectedRoles.filter(Boolean) : [];
+  const filterGameReplyByAllowedRoles = (text: string, allowedRoles?: string[]) => {
+    const allowed = Array.isArray(allowedRoles) ? allowedRoles.filter(Boolean) : [];
     if (viewMode !== 'game') return text;
     if (allowed.length === 0) return '';
     const allowedSet = new Set(allowed);
@@ -499,6 +501,32 @@ export default function Home() {
     return out.join('\n').trim();
   };
 
+  // Bind the roles selected at send-time to the next assistant message(s), so later selection changes
+  // won't retroactively hide/reshape historical replies.
+  useEffect(() => {
+    if (viewMode !== 'game') return;
+    if (!messages || messages.length === 0) return;
+
+    // Assign snapshots to any assistant message that doesn't have one yet.
+    const newMappings: Record<string, string[]> = {};
+    for (const m of messages) {
+      if (m?.role !== 'assistant') continue;
+      const id = String(m.id ?? '');
+      if (!id) continue;
+      if (messageSelectedRoles[id]) continue;
+      const next = selectedRolesQueueRef.current.length > 0
+        ? selectedRolesQueueRef.current.shift()!
+        : (Array.isArray(selectedRoles) ? [...selectedRoles] : []);
+      newMappings[id] = next;
+    }
+
+    if (Object.keys(newMappings).length > 0) {
+      setMessageSelectedRoles((prev) => ({ ...prev, ...newMappings }));
+    }
+    // Intentionally omit messageSelectedRoles to avoid reassigning on every state update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, viewMode]);
+
   // Helper to extract text content from message
   const getMessageContent = (message: any) => {
     let text = '';
@@ -513,7 +541,9 @@ export default function Home() {
     // Only enforce selectedRoles filtering on assistant replies.
     // User messages should always display (just strip hidden meta blocks).
     if (message?.role === 'assistant') {
-      return filterGameReplyBySelectedRoles(cleaned);
+      const id = String(message.id ?? '');
+      const snapshot = id ? messageSelectedRoles[id] : undefined;
+      return filterGameReplyByAllowedRoles(cleaned, snapshot || selectedRoles);
     }
     return cleaned;
   };
@@ -675,10 +705,12 @@ export default function Home() {
 
   const clearChat = () => {
     setMessagesActive([]);
+    setMessageSelectedRoles({});
+    selectedRolesQueueRef.current = [];
     window.speechSynthesis?.cancel?.();
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
+      audioRef.current.src = '';
     }
     // 清空流式 TTS 队列
     audioQueueRef.current = [];
@@ -988,6 +1020,9 @@ export default function Home() {
     setInputValue(""); // Clear input immediately
 
     try {
+      if (viewMode === 'game') {
+        selectedRolesQueueRef.current.push(Array.isArray(selectedRoles) ? [...selectedRoles] : []);
+      }
       const contentForModel = withMetaBlocks(content);
       await sendMessageActive({ role: 'user', content: contentForModel } as any);
       // store user message
@@ -1039,6 +1074,9 @@ export default function Home() {
               stopRecording();
               const content = inputRef.current;
               setInputValue('');
+              if (viewMode === 'game') {
+                selectedRolesQueueRef.current.push(Array.isArray(selectedRoles) ? [...selectedRoles] : []);
+              }
               const contentForModel = withMetaBlocks(content);
               sendMessageActive({ role: 'user', content: contentForModel } as any).catch(err => console.error('Auto-send failed:', err));
             }
@@ -1567,7 +1605,11 @@ export default function Home() {
               messageId={m.id}
               theme={theme}
               viewMode={viewMode}
-              selectedGameRoles={viewMode === 'game' ? selectedRoles : undefined}
+              selectedGameRoles={
+                viewMode === 'game'
+                  ? (messageSelectedRoles[String(m.id ?? '')] || selectedRoles)
+                  : undefined
+              }
             />
           );
         })}
