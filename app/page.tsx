@@ -252,19 +252,19 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
 
       {visibleRoles.map((block) => (
         <div key={`${messageId}-${block.role}`} className="flex gap-3">
-          <div className={`w-9 h-9 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role, viewMode)} shadow-lg shadow-emerald-300/15`}>
+          <div className={`w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role, viewMode)} shadow-lg shadow-emerald-300/15`}>
             {viewMode === 'game' ? (
               <span className="text-[10px] font-semibold leading-none tracking-tight">
                 {getRoleLabel(block.role, viewMode)}
               </span>
             ) : (
-              <span className="text-[11px] font-semibold">{getRoleEmoji(block.role, viewMode)}</span>
+              <span className="text-[22px] leading-none">{getRoleEmoji(block.role, viewMode)}</span>
             )}
           </div>
           <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md rounded-tl-none ${themes[theme].cardBg}`}>
             <div className="text-sm prose max-w-none">
-              {viewMode === 'game' && getRoleLabel(block.role, viewMode) && (
-                <div className="text-[11px] font-semibold mb-1 opacity-80">
+              {getRoleLabel(block.role, viewMode) && (
+                <div className={`${viewMode === 'game' ? 'text-[11px] font-semibold opacity-80' : 'text-[16px] font-extrabold'} mb-1`}>
                   {getRoleLabel(block.role, viewMode)}
                 </div>
               )}
@@ -282,15 +282,15 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
               className={`flex items-center gap-2 text-xs ${themes[theme].textSub}`}
             >
               <div
-                className={`w-5 h-5 rounded-xl flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role, viewMode)} opacity-50`}
+                className={`w-7 h-7 rounded-xl flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role, viewMode)} opacity-50`}
               >
                 {viewMode !== 'game' && (
-                  <span className="text-[9px]">{getRoleEmoji(role, viewMode)}</span>
+                  <span className="text-[14px] leading-none">{getRoleEmoji(role, viewMode)}</span>
                 )}
               </div>
               <span>
-                {viewMode === 'game' && getRoleLabel(role, viewMode) && (
-                  <span className="font-semibold mr-1">{getRoleLabel(role, viewMode)}：</span>
+                {getRoleLabel(role, viewMode) && (
+                  <span className="font-medium">{getRoleLabel(role, viewMode)}：</span>
                 )}
                 {getRoleStatusText(role, viewMode)}
               </span>
