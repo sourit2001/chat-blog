@@ -6,25 +6,33 @@ export const runtime = 'edge';
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { messages, viewMode: bodyViewMode, selectedRoles: bodySelectedRoles } = body;
+        const { messages, viewMode: bodyViewMode, selectedRoles: bodySelectedRoles, userProfile: bodyUserProfile } = body;
         const url = new URL(req.url);
         const queryViewMode = url.searchParams.get('viewMode');
+        const querySelectedRoles = url.searchParams.get('selectedRoles');
+        const queryUserProfile = url.searchParams.get('userProfile');
         
         // Fallback: detect from Referer header
         const referer = req.headers.get('referer') || '';
         const refererViewMode = referer.includes('/lysk') ? 'game' : referer.includes('/mbti') ? 'mbti' : null;
         
-        const viewMode = queryViewMode || bodyViewMode || refererViewMode || 'mbti';
+        const headerViewMode = req.headers.get('x-view-mode');
+        const viewMode = queryViewMode || bodyViewMode || headerViewMode || refererViewMode || 'mbti';
 
         console.log("Received messages:", JSON.stringify(messages, null, 2));
         console.log("Request body:", JSON.stringify(body, null, 2));
         console.log("Referer:", referer);
         console.log("Query viewMode:", queryViewMode);
         console.log("Body viewMode:", bodyViewMode);
+        console.log("Header viewMode:", headerViewMode);
         console.log("Referer viewMode:", refererViewMode);
         console.log("Final viewMode:", viewMode);
 
         // Convert UIMessages (with parts array) to CoreMessages (with content string)
+        const PERSONA_BLOCK_REGEX = /\[\[\[USER_PERSONA\]\]\]([\s\S]*?)\[\[\[\/USER_PERSONA\]\]\]/g;
+        const ROLES_BLOCK_REGEX = /\[\[\[SELECTED_ROLES\]\]\]([\s\S]*?)\[\[\[\/SELECTED_ROLES\]\]\]/g;
+        let inlineUserProfile = '';
+        let inlineSelectedRoles = '';
         const coreMessages = messages.map((msg: any) => {
             if (msg.parts && Array.isArray(msg.parts)) {
                 // Extract text from parts array
@@ -32,9 +40,38 @@ export async function POST(req: Request) {
                     .filter((p: any) => p.type === 'text')
                     .map((p: any) => p.text)
                     .join('');
-                return { role: msg.role, content };
+                let cleaned = content;
+                let m: RegExpExecArray | null;
+                PERSONA_BLOCK_REGEX.lastIndex = 0;
+                while ((m = PERSONA_BLOCK_REGEX.exec(content)) !== null) {
+                  const persona = (m[1] || '').trim();
+                  if (persona) inlineUserProfile = persona;
+                }
+                ROLES_BLOCK_REGEX.lastIndex = 0;
+                while ((m = ROLES_BLOCK_REGEX.exec(content)) !== null) {
+                  const roles = (m[1] || '').trim();
+                  if (roles) inlineSelectedRoles = roles;
+                }
+                cleaned = cleaned.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
+                return { role: msg.role, content: cleaned };
             }
             // If already in core format, return as is
+            if (typeof msg?.content === 'string') {
+              const raw = msg.content as string;
+              let m: RegExpExecArray | null;
+              PERSONA_BLOCK_REGEX.lastIndex = 0;
+              while ((m = PERSONA_BLOCK_REGEX.exec(raw)) !== null) {
+                const persona = (m[1] || '').trim();
+                if (persona) inlineUserProfile = persona;
+              }
+              ROLES_BLOCK_REGEX.lastIndex = 0;
+              while ((m = ROLES_BLOCK_REGEX.exec(raw)) !== null) {
+                const roles = (m[1] || '').trim();
+                if (roles) inlineSelectedRoles = roles;
+              }
+              const cleaned = raw.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
+              return { ...msg, content: cleaned };
+            }
             return msg;
         });
 
@@ -51,9 +88,74 @@ export async function POST(req: Request) {
         }
         // Allowed speaker names (game mode)
         const allRoles = ['沈星回','黎深','祁煜','夏以昼','秦彻'];
-        const selectedRoles = (Array.isArray(bodySelectedRoles) && bodySelectedRoles.length > 0)
-          ? bodySelectedRoles.filter((r: any) => allRoles.includes(r))
+        const headerSelectedRoles = req.headers.get('x-selected-roles') || '';
+        const queryRolesList = (querySelectedRoles || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const headerRolesList = headerSelectedRoles
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        const inlineRolesList = (inlineSelectedRoles || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const incomingRoles = (Array.isArray(bodySelectedRoles) && bodySelectedRoles.length > 0)
+          ? bodySelectedRoles
+          : (headerRolesList.length > 0 ? headerRolesList : (queryRolesList.length > 0 ? queryRolesList : inlineRolesList));
+        const selectedRoles = (Array.isArray(incomingRoles) && incomingRoles.length > 0)
+          ? incomingRoles.filter((r: any) => allRoles.includes(r))
           : allRoles;
+
+        const headerUserProfileRaw = req.headers.get('x-user-profile') || '';
+        let headerUserProfile = '';
+        try {
+          headerUserProfile = decodeURIComponent(headerUserProfileRaw);
+        } catch {
+          headerUserProfile = headerUserProfileRaw;
+        }
+        let decodedQueryUserProfile = '';
+        try {
+          decodedQueryUserProfile = queryUserProfile ? decodeURIComponent(queryUserProfile) : '';
+        } catch {
+          decodedQueryUserProfile = queryUserProfile || '';
+        }
+        const incomingUserProfile = (typeof bodyUserProfile === 'string' && bodyUserProfile.trim())
+          ? bodyUserProfile
+          : (headerUserProfile?.trim() ? headerUserProfile : (decodedQueryUserProfile?.trim() ? decodedQueryUserProfile : inlineUserProfile));
+        const normalizedUserProfile = (typeof incomingUserProfile === 'string') ? incomingUserProfile.trim() : '';
+
+        console.log("Header selectedRoles:", headerRolesList);
+        console.log("Query selectedRoles:", queryRolesList);
+        console.log("Has inline selectedRoles:", inlineRolesList.length > 0);
+        console.log("Final selectedRoles:", selectedRoles);
+        console.log("Has header userProfile:", Boolean(headerUserProfile?.trim()));
+        console.log("Has query userProfile:", Boolean(decodedQueryUserProfile?.trim()));
+        console.log("Has body userProfile:", Boolean((typeof bodyUserProfile === 'string' && bodyUserProfile.trim())));
+        console.log("Has inline userProfile:", Boolean(inlineUserProfile?.trim()));
+        console.log("UserProfile length:", normalizedUserProfile.length);
+        const userProfilePrompt = normalizedUserProfile
+          ? `【用户画像（重要背景，需长期一致但不要照抄复读）】\n${normalizedUserProfile}\n- 你们要把这些信息当成“认识她很久”的背景，用来挑选称呼、话题与关心点；不要每轮都完整复述画像内容。\n- 若画像与用户当下表达冲突，以用户当下为准，并以更自然的方式询问/确认。`
+          : '';
+
+        const filterDisallowedSpeakers = (text: string, allowed: string[]) => {
+          if (!text) return text;
+          const allowedSet = new Set(allowed);
+          const lines = text.split(/\r?\n/);
+          const out: string[] = [];
+          for (const line of lines) {
+            const m = line.match(/^\s*(沈星回|黎深|祁煜|夏以昼|秦彻)：/);
+            if (!m) {
+              if (out.length > 0) out.push(line);
+              continue;
+            }
+            const speaker = m[1];
+            if (allowedSet.has(speaker)) out.push(line);
+          }
+          return out.join('\n').trim();
+        };
 
         const mbtiSystemPrompt = `你是一个由五个 MBTI 角色组成的创作小组，一起陪用户聊天、头脑风暴，并把想法打磨成真正“有人味”的博客内容。
 
@@ -174,11 +276,11 @@ export async function POST(req: Request) {
 
         const n = selectedRoles.length;
         const allowLine = n === 1
-          ? `【仅可用人选】本轮只有「${selectedRoles[0]}」一人发言。每段必须以「${selectedRoles[0]}：」为前缀。严禁出现任何其他人名。`
-          : `【仅可用人选】本轮只允许以下人名作为段首前缀：${selectedRoles.join('、')}。每段前缀必须来自该列表；仅从这些人中选择发言（1~${n} 位），严禁出现列表外的人名。`;
-        const guardExtra = `【自检修正】若出现未在允许列表中的前缀，立刻删除该无效前缀，并改为最近一句中最贴切的允许人名；不要在正文解释这一操作。`;
+          ? `【仅可用人选】本轮只有「${selectedRoles[0]}」一人发言。只输出 1 段，且必须以「${selectedRoles[0]}：」为前缀。除该前缀外，正文中也不要提到任何其他男主姓名（他们必须完全沉默、不可被点名）。`
+          : `【仅可用人选】本轮只允许以下人名作为段首前缀：${selectedRoles.join('、')}。仅从这些人中选择发言（1~${n} 位）。严禁出现列表外的人名作为前缀；并且在正文中也不要提到任何未被选择的男主姓名（未选者必须完全沉默、不可被点名）。`;
+        const guardExtra = `【硬性自检】在输出前进行内部自检：若文本中出现任何未被选择的男主姓名或其前缀段落，必须在内部重写并删除这些内容，直到完全合规。不要在正文解释自检过程。`;
         const systemPrompt = viewMode === 'game' 
-            ? `${gameSystemPrompt}\n${allowLine}\n${guardExtra}\n${gameGuardPrompt}` 
+            ? `${gameSystemPrompt}\n${userProfilePrompt}\n${allowLine}\n${guardExtra}\n${gameGuardPrompt}` 
             : mbtiSystemPrompt;
 
         const result = await streamText({
@@ -188,7 +290,8 @@ export async function POST(req: Request) {
             topP: viewMode === 'game' ? 0.9 : 0.9,
             messages: viewMode === 'game' ? [...primingSamples, ...sanitizedMessages] : sanitizedMessages,
             onFinish: ({ text }) => {
-                console.log('Full response:', text);
+                const logged = viewMode === 'game' ? filterDisallowedSpeakers(text, selectedRoles) : text;
+                console.log('Full response:', logged);
             },
         });
 

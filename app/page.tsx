@@ -196,7 +196,7 @@ const getRoleStatusText = (role: string, mode: ViewMode) => {
   }
 };
 
-function MbtiReply({ parsed, messageId, theme, viewMode }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes; viewMode: ViewMode }) {
+function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[] }) {
   const [visibleCount, setVisibleCount] = useState(0);
 
   // 当消息 ID 变化时，初始化可见计数（避免每次流式内容变化都重置）
@@ -221,7 +221,19 @@ function MbtiReply({ parsed, messageId, theme, viewMode }: { parsed: ParsedMbtiR
 
   const visibleRoles = parsed.roles.slice(0, visibleCount || 1);
   const spokenRoles = new Set(parsed.roles.map((r) => r.role));
-  const silentRoles = allMbtiRoles.filter((r) => !spokenRoles.has(r));
+  const nameToSlot: Record<string, (typeof allMbtiRoles)[number]> = {
+    '祁煜': 'ENTJ',
+    '黎深': 'ISTJ',
+    '沈星回': 'ENFP',
+    '夏以昼': 'INFP',
+    '秦彻': 'ENFJ',
+  };
+  const allowedSlots = viewMode === 'game'
+    ? (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0
+        ? selectedGameRoles.map((n) => nameToSlot[n]).filter(Boolean)
+        : [])
+    : allMbtiRoles;
+  const silentRoles = allowedSlots.filter((r) => !spokenRoles.has(r));
 
   return (
     <div className={`space-y-3 ${themes[theme].text}`}>
@@ -308,14 +320,72 @@ export default function Home() {
   // Game mode: selectable chat members (default all 5)
   const allGameRoles = ['沈星回','黎深','祁煜','夏以昼','秦彻'] as const;
   const [selectedRoles, setSelectedRoles] = useState<string[]>([...allGameRoles]);
+  const userProfileStorageKey = 'chat_user_profile_v2';
+  const legacyUserProfileStorageKey = 'chat_user_profile_v1';
+  type UserPersona = {
+    name: string;
+    mbti: string;
+    likes: string;
+    schedule: string;
+    work: string;
+    redlines: string;
+    extras: string;
+  };
+  const emptyPersona: UserPersona = { name: '', mbti: '', likes: '', schedule: '', work: '', redlines: '', extras: '' };
+  const [userPersona, setUserPersona] = useState<UserPersona>(emptyPersona);
+  const formatPersonaToPrompt = (p: UserPersona) => {
+    const lines: string[] = [];
+    if (p.name?.trim()) lines.push(`人设名：${p.name.trim()}`);
+    if (p.mbti?.trim()) lines.push(`MBTI：${p.mbti.trim()}`);
+    if (p.likes?.trim()) lines.push(`喜欢/偏好：${p.likes.trim()}`);
+    if (p.schedule?.trim()) lines.push(`作息：${p.schedule.trim()}`);
+    if (p.work?.trim()) lines.push(`工作/学习：${p.work.trim()}`);
+    if (p.redlines?.trim()) lines.push(`雷点/禁忌：${p.redlines.trim()}`);
+    if (p.extras?.trim()) lines.push(`补充：${p.extras.trim()}`);
+    return lines.join('\n');
+  };
+  const userProfile = formatPersonaToPrompt(userPersona);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(userProfileStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<UserPersona>;
+        setUserPersona({ ...emptyPersona, ...parsed });
+        return;
+      }
+      const legacy = window.localStorage.getItem(legacyUserProfileStorageKey);
+      if (legacy && legacy.trim()) {
+        setUserPersona({ ...emptyPersona, extras: legacy.trim() });
+        window.localStorage.setItem(userProfileStorageKey, JSON.stringify({ ...emptyPersona, extras: legacy.trim() }));
+      }
+    } catch {}
+  }, []);
+  const persistUserPersona = (next: UserPersona) => {
+    try {
+      window.localStorage.setItem(userProfileStorageKey, JSON.stringify(next));
+    } catch {}
+  };
+  const gameRequestHeaders = {
+    'x-view-mode': 'game',
+    'x-selected-roles': selectedRoles.join(','),
+    'x-user-profile': encodeURIComponent(userProfile || ''),
+  } as const;
+  const mbtiRequestHeaders = {
+    'x-view-mode': 'mbti',
+    'x-user-profile': encodeURIComponent(userProfile || ''),
+  } as const;
+  const gameApi = `/api/chat?viewMode=game&selectedRoles=${encodeURIComponent(selectedRoles.join(','))}&userProfile=${encodeURIComponent(userProfile || '')}`;
+  const mbtiApi = `/api/chat?viewMode=mbti&userProfile=${encodeURIComponent(userProfile || '')}`;
   const chatMbti = useChat({
     id: 'mbti-session',
-    body: { viewMode: 'mbti' },
+    api: mbtiApi,
+    headers: mbtiRequestHeaders,
     onError: (err: unknown) => console.error("Chat error:", err),
   } as any);
   const chatGame = useChat({
     id: 'game-session',
-    body: { viewMode: 'game', selectedRoles },
+    api: gameApi,
+    headers: gameRequestHeaders,
     onError: (err: unknown) => console.error("Chat error:", err),
   } as any);
   const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
@@ -386,17 +456,66 @@ export default function Home() {
     inputRef.current = inputValue;
   }, [inputValue]);
 
+  const PERSONA_BLOCK_START = '[[[USER_PERSONA';
+  const PERSONA_BLOCK_REGEX = /\[\[\[USER_PERSONA\]\]\][\s\S]*?\[\[\[\/USER_PERSONA\]\]\]/g;
+  const stripPersonaBlock = (text: string) => (text || '').replace(PERSONA_BLOCK_REGEX, '').trim();
+  const withPersonaBlock = (text: string) => {
+    const plain = stripPersonaBlock(text || '');
+    const profile = (userProfile || '').trim();
+    if (!profile) return plain;
+    // Append a hidden block that backend will parse and strip before sending to the model
+    return `${plain}\n\n[[[USER_PERSONA]]]\n${profile}\n[[[/USER_PERSONA]]]`;
+  };
+
+  const ROLES_BLOCK_REGEX = /\[\[\[SELECTED_ROLES\]\]\][\s\S]*?\[\[\[\/SELECTED_ROLES\]\]\]/g;
+  const stripRolesBlock = (text: string) => (text || '').replace(ROLES_BLOCK_REGEX, '').trim();
+  const withRolesBlock = (text: string) => {
+    const plain = stripRolesBlock(text || '');
+    if (viewMode !== 'game') return plain;
+    const roles = Array.isArray(selectedRoles) ? selectedRoles.filter(Boolean) : [];
+    if (roles.length === 0) return plain;
+    return `${plain}\n\n[[[SELECTED_ROLES]]]\n${roles.join(',')}\n[[[/SELECTED_ROLES]]]`;
+  };
+
+  const withMetaBlocks = (text: string) => withRolesBlock(withPersonaBlock(text));
+
+  const filterGameReplyBySelectedRoles = (text: string) => {
+    const allowed = Array.isArray(selectedRoles) ? selectedRoles.filter(Boolean) : [];
+    if (viewMode !== 'game') return text;
+    if (allowed.length === 0) return '';
+    const allowedSet = new Set(allowed);
+    const lines = (text || '').split(/\r?\n/);
+    const out: string[] = [];
+    for (const line of lines) {
+      const m = line.match(/^\s*(沈星回|黎深|祁煜|夏以昼|秦彻)：/);
+      if (!m) {
+        // Keep non-speaker lines only if they follow an allowed speaker block already
+        if (out.length > 0) out.push(line);
+        continue;
+      }
+      const speaker = m[1];
+      if (allowedSet.has(speaker)) out.push(line);
+    }
+    return out.join('\n').trim();
+  };
+
   // Helper to extract text content from message
   const getMessageContent = (message: any) => {
-    if (typeof message.content === 'string') return message.content;
-    if (Array.isArray(message.content)) {
-      return message.content.map((p: any) => p.text || '').join('');
+    let text = '';
+    if (typeof message.content === 'string') text = message.content;
+    else if (Array.isArray(message.content)) {
+      text = message.content.map((p: any) => p.text || '').join('');
+    } else if (message.parts && Array.isArray(message.parts)) {
+      // Fallback for messages with parts but no content (e.g. from sendMessage with parts)
+      text = message.parts.map((p: any) => p.text || '').join('');
     }
-    // Fallback for messages with parts but no content (e.g. from sendMessage with parts)
-    if (message.parts && Array.isArray(message.parts)) {
-      return message.parts.map((p: any) => p.text || '').join('');
+    const cleaned = stripRolesBlock(stripPersonaBlock(text));
+    // Only enforce selectedRoles filtering on assistant replies.
+    // User messages should always display (just strip hidden meta blocks).
+    if (message?.role === 'assistant') {
+      return filterGameReplyBySelectedRoles(cleaned);
     }
-    return '';
+    return cleaned;
   };
 
   const parseMbtiGroupReply = (content: string) => {
@@ -869,9 +988,10 @@ export default function Home() {
     setInputValue(""); // Clear input immediately
 
     try {
-      await sendMessageActive({ role: 'user', content } as any);
+      const contentForModel = withMetaBlocks(content);
+      await sendMessageActive({ role: 'user', content: contentForModel } as any);
       // store user message
-      await saveMessage('user', content);
+      await saveMessage('user', stripRolesBlock(stripPersonaBlock(content)));
     } catch (err) {
       console.error("Failed to send message:", err);
     }
@@ -919,7 +1039,8 @@ export default function Home() {
               stopRecording();
               const content = inputRef.current;
               setInputValue('');
-              sendMessageActive({ role: 'user', content } as any).catch(err => console.error('Auto-send failed:', err));
+              const contentForModel = withMetaBlocks(content);
+              sendMessageActive({ role: 'user', content: contentForModel } as any).catch(err => console.error('Auto-send failed:', err));
             }
           }, 2000);
         }
@@ -1137,11 +1258,120 @@ export default function Home() {
             <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-200 shadow cursor-pointer">
               <Menu className="w-5 h-5 text-gray-800" />
             </summary>
-            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white/95 shadow-lg border border-white/60 p-2 space-y-1">
+            <div className="absolute right-0 mt-2 w-80 max-h-[75vh] overflow-y-auto overscroll-contain rounded-xl bg-white/95 shadow-lg border border-white/60 p-2 space-y-1">
               <a href="/mbti" className="block px-3 py-2 rounded-lg text-sm hover:bg-emerald-50">MBTI</a>
               <a href="/lysk" className="block px-3 py-2 rounded-lg text-sm hover:bg-purple-50">恋与深空</a>
               <a href="/history" className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50">我的聊天</a>
               <a href="/login" className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50">登录</a>
+              <div className="h-px bg-gray-100 my-1" />
+              <div className="px-2 py-1 text-[11px] text-gray-500">我的信息（可选）</div>
+              <div className="px-2 py-1 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="col-span-2">
+                    <div className="text-[11px] text-gray-500 mb-1">人设名（必填，后续对话默认使用这个人设）</div>
+                    <input
+                      value={userPersona.name}
+                      onChange={(e) => {
+                        const next = { ...userPersona, name: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="例如：小雨 / 阿梨 / 我本人"
+                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500 mb-1">MBTI</div>
+                    <input
+                      value={userPersona.mbti}
+                      onChange={(e) => {
+                        const next = { ...userPersona, mbti: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="INFP"
+                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500 mb-1">作息</div>
+                    <input
+                      value={userPersona.schedule}
+                      onChange={(e) => {
+                        const next = { ...userPersona, schedule: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="晚睡/早起/熬夜党"
+                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[11px] text-gray-500 mb-1">喜欢吃/偏好</div>
+                    <input
+                      value={userPersona.likes}
+                      onChange={(e) => {
+                        const next = { ...userPersona, likes: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="抹茶/辣锅/烤肉（不吃香菜）"
+                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[11px] text-gray-500 mb-1">工作/学习</div>
+                    <input
+                      value={userPersona.work}
+                      onChange={(e) => {
+                        const next = { ...userPersona, work: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="互联网产品/学生/自由职业..."
+                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[11px] text-gray-500 mb-1">雷点/禁忌</div>
+                    <input
+                      value={userPersona.redlines}
+                      onChange={(e) => {
+                        const next = { ...userPersona, redlines: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="例如：别叫我MC；别说教；别冷暴力"
+                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[11px] text-gray-500 mb-1">补充（可选）</div>
+                    <textarea
+                      value={userPersona.extras}
+                      onChange={(e) => {
+                        const next = { ...userPersona, extras: e.target.value };
+                        setUserPersona(next);
+                        persistUserPersona(next);
+                      }}
+                      placeholder="想让他们记住的其他细节..."
+                      className="w-full min-h-[70px] resize-y rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-400">会自动保存到本机并用于后续聊天</span>
+                  <button
+                    onClick={() => {
+                      setUserPersona(emptyPersona);
+                      persistUserPersona(emptyPersona);
+                    }}
+                    className="px-2 py-1 text-[11px] rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200"
+                  >
+                    清空
+                  </button>
+                </div>
+              </div>
               {!fixedMode && (
                 <>
                   <div className="h-px bg-gray-100 my-1" />
@@ -1197,6 +1427,24 @@ export default function Home() {
           </details>
         </div>
       </header>
+      {(viewMode === 'game' || viewMode === 'mbti') && (
+        <div className="px-4 py-2 bg-white/80 backdrop-blur border-b border-gray-200">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
+            <div className="text-sm text-gray-700">
+              <span className="font-medium text-gray-900">当前人设：</span>
+              {userPersona?.name?.trim() ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                  {userPersona.name.trim()}
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                  未设置（去右上角菜单填写“人设名”）
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {viewMode==='game' && (
         <div className="px-4 py-2 bg-white/80 backdrop-blur border-b border-gray-200">
           <div className="flex items-center justify-between max-w-5xl mx-auto">
@@ -1269,7 +1517,14 @@ export default function Home() {
           }
 
           return (
-            <MbtiReply key={m.id} parsed={parsed!} messageId={m.id} theme={theme} viewMode={viewMode} />
+            <MbtiReply
+              key={m.id}
+              parsed={parsed!}
+              messageId={m.id}
+              theme={theme}
+              viewMode={viewMode}
+              selectedGameRoles={viewMode === 'game' ? selectedRoles : undefined}
+            />
           );
         })}
       </div>
