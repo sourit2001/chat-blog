@@ -1,163 +1,171 @@
 import { google } from "@ai-sdk/google";
 import { streamText, generateText } from "ai";
 
-export const runtime = 'edge';
+export const maxDuration = 60;
+
+
 
 export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { messages, viewMode: bodyViewMode, selectedRoles: bodySelectedRoles, userProfile: bodyUserProfile } = body;
+    const url = new URL(req.url);
+    const queryViewMode = url.searchParams.get('viewMode');
+    const querySelectedRoles = url.searchParams.get('selectedRoles');
+    const queryUserProfile = url.searchParams.get('userProfile');
+
+    // Fallback: detect from Referer header
+    const referer = req.headers.get('referer') || '';
+    const refererViewMode = referer.includes('/lysk') ? 'game' : referer.includes('/mbti') ? 'mbti' : null;
+
+    const headerViewMode = req.headers.get('x-view-mode');
+    const viewMode = queryViewMode || bodyViewMode || headerViewMode || refererViewMode || 'mbti';
+
+    console.log("Received messages:", JSON.stringify(messages, null, 2));
+    console.log("Request body:", JSON.stringify(body, null, 2));
+    console.log("Referer:", referer);
+    console.log("Query viewMode:", queryViewMode);
+    console.log("Body viewMode:", bodyViewMode);
+    console.log("Header viewMode:", headerViewMode);
+    console.log("Referer viewMode:", refererViewMode);
+    console.log("Final viewMode:", viewMode);
+
+    // Convert UIMessages (with parts array) to CoreMessages (with content string)
+    const PERSONA_BLOCK_REGEX = /\[\[\[USER_PERSONA\]\]\]([\s\S]*?)\[\[\[\/USER_PERSONA\]\]\]/g;
+    const ROLES_BLOCK_REGEX = /\[\[\[SELECTED_ROLES\]\]\]([\s\S]*?)\[\[\[\/SELECTED_ROLES\]\]\]/g;
+    let inlineUserProfile = '';
+    let inlineSelectedRoles = '';
+    const coreMessages = messages.map((msg: any) => {
+      if (msg.parts && Array.isArray(msg.parts)) {
+        // Extract text from parts array
+        const content = msg.parts
+          .filter((p: any) => p.type === 'text')
+          .map((p: any) => p.text)
+          .join('');
+        let cleaned = content;
+        let m: RegExpExecArray | null;
+        PERSONA_BLOCK_REGEX.lastIndex = 0;
+        while ((m = PERSONA_BLOCK_REGEX.exec(content)) !== null) {
+          const persona = (m[1] || '').trim();
+          if (persona) inlineUserProfile = persona;
+        }
+        ROLES_BLOCK_REGEX.lastIndex = 0;
+        while ((m = ROLES_BLOCK_REGEX.exec(content)) !== null) {
+          const roles = (m[1] || '').trim();
+          if (roles) inlineSelectedRoles = roles;
+        }
+        cleaned = cleaned.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
+        return { role: msg.role, content: cleaned };
+      }
+      // If already in core format, return as is
+      if (typeof msg?.content === 'string') {
+        const raw = msg.content as string;
+        let m: RegExpExecArray | null;
+        PERSONA_BLOCK_REGEX.lastIndex = 0;
+        while ((m = PERSONA_BLOCK_REGEX.exec(raw)) !== null) {
+          const persona = (m[1] || '').trim();
+          if (persona) inlineUserProfile = persona;
+        }
+        ROLES_BLOCK_REGEX.lastIndex = 0;
+        while ((m = ROLES_BLOCK_REGEX.exec(raw)) !== null) {
+          const roles = (m[1] || '').trim();
+          if (roles) inlineSelectedRoles = roles;
+        }
+        const cleaned = raw.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
+        return { ...msg, content: cleaned };
+      }
+      return msg;
+    });
+
+    console.log("Converted to core messages:", JSON.stringify(coreMessages, null, 2));
+
+    // Sanitize / limit history
+    // MBTI mode: keep full history (handled by client), Game mode: keep recent turns to preserve memory
+    let sanitizedMessages = coreMessages;
+    if (viewMode === 'game') {
+      const MAX_GAME_HISTORY = 24; // keep last ~12 turns (user+assistant)
+      sanitizedMessages = coreMessages
+        .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .slice(-MAX_GAME_HISTORY);
+    }
+    // Allowed speaker names (game mode)
+    const allRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'];
+    const headerSelectedRoles = req.headers.get('x-selected-roles') || '';
+    const queryRolesList = (querySelectedRoles || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const headerRolesList = headerSelectedRoles
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const inlineRolesList = (inlineSelectedRoles || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const incomingRoles = (Array.isArray(bodySelectedRoles) && bodySelectedRoles.length > 0)
+      ? bodySelectedRoles
+      : (headerRolesList.length > 0 ? headerRolesList : (queryRolesList.length > 0 ? queryRolesList : inlineRolesList));
+    const selectedRoles = (Array.isArray(incomingRoles) && incomingRoles.length > 0)
+      ? incomingRoles.filter((r: any) => allRoles.includes(r))
+      : allRoles;
+
+    const headerUserProfileRaw = req.headers.get('x-user-profile') || '';
+    let headerUserProfile = '';
     try {
-        const body = await req.json();
-        const { messages, viewMode: bodyViewMode, selectedRoles: bodySelectedRoles, userProfile: bodyUserProfile } = body;
-        const url = new URL(req.url);
-        const queryViewMode = url.searchParams.get('viewMode');
-        const querySelectedRoles = url.searchParams.get('selectedRoles');
-        const queryUserProfile = url.searchParams.get('userProfile');
-        
-        // Fallback: detect from Referer header
-        const referer = req.headers.get('referer') || '';
-        const refererViewMode = referer.includes('/lysk') ? 'game' : referer.includes('/mbti') ? 'mbti' : null;
-        
-        const headerViewMode = req.headers.get('x-view-mode');
-        const viewMode = queryViewMode || bodyViewMode || headerViewMode || refererViewMode || 'mbti';
+      headerUserProfile = decodeURIComponent(headerUserProfileRaw);
+    } catch {
+      headerUserProfile = headerUserProfileRaw;
+    }
+    let decodedQueryUserProfile = '';
+    try {
+      decodedQueryUserProfile = queryUserProfile ? decodeURIComponent(queryUserProfile) : '';
+    } catch {
+      decodedQueryUserProfile = queryUserProfile || '';
+    }
+    const incomingUserProfile = (typeof bodyUserProfile === 'string' && bodyUserProfile.trim())
+      ? bodyUserProfile
+      : (headerUserProfile?.trim() ? headerUserProfile : (decodedQueryUserProfile?.trim() ? decodedQueryUserProfile : inlineUserProfile));
+    const normalizedUserProfile = (typeof incomingUserProfile === 'string') ? incomingUserProfile.trim() : '';
 
-        console.log("Received messages:", JSON.stringify(messages, null, 2));
-        console.log("Request body:", JSON.stringify(body, null, 2));
-        console.log("Referer:", referer);
-        console.log("Query viewMode:", queryViewMode);
-        console.log("Body viewMode:", bodyViewMode);
-        console.log("Header viewMode:", headerViewMode);
-        console.log("Referer viewMode:", refererViewMode);
-        console.log("Final viewMode:", viewMode);
+    console.log("Header selectedRoles:", headerRolesList);
+    console.log("Query selectedRoles:", queryRolesList);
+    console.log("Has inline selectedRoles:", inlineRolesList.length > 0);
+    console.log("Final selectedRoles:", selectedRoles);
+    console.log("Has header userProfile:", Boolean(headerUserProfile?.trim()));
+    console.log("Has query userProfile:", Boolean(decodedQueryUserProfile?.trim()));
+    console.log("Has body userProfile:", Boolean((typeof bodyUserProfile === 'string' && bodyUserProfile.trim())));
+    console.log("Has inline userProfile:", Boolean(inlineUserProfile?.trim()));
+    console.log("UserProfile length:", normalizedUserProfile.length);
+    const userProfilePrompt = normalizedUserProfile
+      ? `【用户画像（重要背景，需长期一致但不要照抄复读）】\n${normalizedUserProfile}\n- 你们要把这些信息当成“认识她很久”的背景，用来挑选称呼、话题与关心点；不要每轮都完整复述画像内容。\n- 若画像与用户当下表达冲突，以用户当下为准，并以更自然的方式询问/确认。`
+      : '';
 
-        // Convert UIMessages (with parts array) to CoreMessages (with content string)
-        const PERSONA_BLOCK_REGEX = /\[\[\[USER_PERSONA\]\]\]([\s\S]*?)\[\[\[\/USER_PERSONA\]\]\]/g;
-        const ROLES_BLOCK_REGEX = /\[\[\[SELECTED_ROLES\]\]\]([\s\S]*?)\[\[\[\/SELECTED_ROLES\]\]\]/g;
-        let inlineUserProfile = '';
-        let inlineSelectedRoles = '';
-        const coreMessages = messages.map((msg: any) => {
-            if (msg.parts && Array.isArray(msg.parts)) {
-                // Extract text from parts array
-                const content = msg.parts
-                    .filter((p: any) => p.type === 'text')
-                    .map((p: any) => p.text)
-                    .join('');
-                let cleaned = content;
-                let m: RegExpExecArray | null;
-                PERSONA_BLOCK_REGEX.lastIndex = 0;
-                while ((m = PERSONA_BLOCK_REGEX.exec(content)) !== null) {
-                  const persona = (m[1] || '').trim();
-                  if (persona) inlineUserProfile = persona;
-                }
-                ROLES_BLOCK_REGEX.lastIndex = 0;
-                while ((m = ROLES_BLOCK_REGEX.exec(content)) !== null) {
-                  const roles = (m[1] || '').trim();
-                  if (roles) inlineSelectedRoles = roles;
-                }
-                cleaned = cleaned.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
-                return { role: msg.role, content: cleaned };
-            }
-            // If already in core format, return as is
-            if (typeof msg?.content === 'string') {
-              const raw = msg.content as string;
-              let m: RegExpExecArray | null;
-              PERSONA_BLOCK_REGEX.lastIndex = 0;
-              while ((m = PERSONA_BLOCK_REGEX.exec(raw)) !== null) {
-                const persona = (m[1] || '').trim();
-                if (persona) inlineUserProfile = persona;
-              }
-              ROLES_BLOCK_REGEX.lastIndex = 0;
-              while ((m = ROLES_BLOCK_REGEX.exec(raw)) !== null) {
-                const roles = (m[1] || '').trim();
-                if (roles) inlineSelectedRoles = roles;
-              }
-              const cleaned = raw.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
-              return { ...msg, content: cleaned };
-            }
-            return msg;
-        });
+    // Getting current date for grounding context
+    const now = new Date();
+    const currentDateString = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const currentTimeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const timeContext = `\n【当前时间（真实世界）】\n今天是 ${currentDateString}，时间 ${currentTimeString}。请基于这个“当前准确时间”来回答关于日期、节日或时效性新闻的问题。如果用户询问“今天”，指的就是这一天。`;
 
-        console.log("Converted to core messages:", JSON.stringify(coreMessages, null, 2));
-
-        // Sanitize / limit history
-        // MBTI mode: keep full history (handled by client), Game mode: keep recent turns to preserve memory
-        let sanitizedMessages = coreMessages;
-        if (viewMode === 'game') {
-          const MAX_GAME_HISTORY = 24; // keep last ~12 turns (user+assistant)
-          sanitizedMessages = coreMessages
-            .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-            .slice(-MAX_GAME_HISTORY);
+    const filterDisallowedSpeakers = (text: string, allowed: string[]) => {
+      if (!text) return text;
+      const allowedSet = new Set(allowed);
+      const lines = text.split(/\r?\n/);
+      const out: string[] = [];
+      for (const line of lines) {
+        const m = line.match(/^\s*(沈星回|黎深|祁煜|夏以昼|秦彻)：/);
+        if (!m) {
+          if (out.length > 0) out.push(line);
+          continue;
         }
-        // Allowed speaker names (game mode)
-        const allRoles = ['沈星回','黎深','祁煜','夏以昼','秦彻'];
-        const headerSelectedRoles = req.headers.get('x-selected-roles') || '';
-        const queryRolesList = (querySelectedRoles || '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const headerRolesList = headerSelectedRoles
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
+        const speaker = m[1];
+        if (allowedSet.has(speaker)) out.push(line);
+      }
+      return out.join('\n').trim();
+    };
 
-        const inlineRolesList = (inlineSelectedRoles || '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const incomingRoles = (Array.isArray(bodySelectedRoles) && bodySelectedRoles.length > 0)
-          ? bodySelectedRoles
-          : (headerRolesList.length > 0 ? headerRolesList : (queryRolesList.length > 0 ? queryRolesList : inlineRolesList));
-        const selectedRoles = (Array.isArray(incomingRoles) && incomingRoles.length > 0)
-          ? incomingRoles.filter((r: any) => allRoles.includes(r))
-          : allRoles;
-
-        const headerUserProfileRaw = req.headers.get('x-user-profile') || '';
-        let headerUserProfile = '';
-        try {
-          headerUserProfile = decodeURIComponent(headerUserProfileRaw);
-        } catch {
-          headerUserProfile = headerUserProfileRaw;
-        }
-        let decodedQueryUserProfile = '';
-        try {
-          decodedQueryUserProfile = queryUserProfile ? decodeURIComponent(queryUserProfile) : '';
-        } catch {
-          decodedQueryUserProfile = queryUserProfile || '';
-        }
-        const incomingUserProfile = (typeof bodyUserProfile === 'string' && bodyUserProfile.trim())
-          ? bodyUserProfile
-          : (headerUserProfile?.trim() ? headerUserProfile : (decodedQueryUserProfile?.trim() ? decodedQueryUserProfile : inlineUserProfile));
-        const normalizedUserProfile = (typeof incomingUserProfile === 'string') ? incomingUserProfile.trim() : '';
-
-        console.log("Header selectedRoles:", headerRolesList);
-        console.log("Query selectedRoles:", queryRolesList);
-        console.log("Has inline selectedRoles:", inlineRolesList.length > 0);
-        console.log("Final selectedRoles:", selectedRoles);
-        console.log("Has header userProfile:", Boolean(headerUserProfile?.trim()));
-        console.log("Has query userProfile:", Boolean(decodedQueryUserProfile?.trim()));
-        console.log("Has body userProfile:", Boolean((typeof bodyUserProfile === 'string' && bodyUserProfile.trim())));
-        console.log("Has inline userProfile:", Boolean(inlineUserProfile?.trim()));
-        console.log("UserProfile length:", normalizedUserProfile.length);
-        const userProfilePrompt = normalizedUserProfile
-          ? `【用户画像（重要背景，需长期一致但不要照抄复读）】\n${normalizedUserProfile}\n- 你们要把这些信息当成“认识她很久”的背景，用来挑选称呼、话题与关心点；不要每轮都完整复述画像内容。\n- 若画像与用户当下表达冲突，以用户当下为准，并以更自然的方式询问/确认。`
-          : '';
-
-        const filterDisallowedSpeakers = (text: string, allowed: string[]) => {
-          if (!text) return text;
-          const allowedSet = new Set(allowed);
-          const lines = text.split(/\r?\n/);
-          const out: string[] = [];
-          for (const line of lines) {
-            const m = line.match(/^\s*(沈星回|黎深|祁煜|夏以昼|秦彻)：/);
-            if (!m) {
-              if (out.length > 0) out.push(line);
-              continue;
-            }
-            const speaker = m[1];
-            if (allowedSet.has(speaker)) out.push(line);
-          }
-          return out.join('\n').trim();
-        };
-
-        const mbtiSystemPrompt = `你是一个由五个 MBTI 角色组成的创作小组，一起陪用户聊天、头脑风暴，并把想法打磨成真正“有人味”的博客内容。
+    const mbtiSystemPrompt = `你是一个由五个 MBTI 角色组成的创作小组，一起陪用户聊天、头脑风暴，并把想法打磨成真正“有人味”的博客内容。
 
 小组固定成员（请像真人朋友一样说话，而不是冰冷的机器人）：
 - ENTJ：战略家和领导者，擅长帮用户“定方向”和做取舍，说话直接、有点犀利但出发点是为你好，可以适度带一点职场感、效率感。
@@ -174,9 +182,10 @@ export async function POST(req: Request) {
 5. 在本轮发言的角色都说完之后，再给出一个简短的小结段落。
 
 语言要求：
-- 优先使用中文，用口语化表达，适度幽默、真诚。`;
+- 优先使用中文，用口语化表达，适度幽默、真诚。
+- 【重要】你们拥有实时联网能力（基于 Google Search），可以知道最新的新闻、天气、热梗或用户提到的当下信息。请自然地将这些信息融入对话，保持“5G冲浪”的时效感，但不要生硬地说“我查询了...”。`;
 
-        const gameSystemPrompt = `你们是五位《恋与深空》男主在同一个“恋爱群聊”中对话，用户=女主（“你/猎人小姐”）。每位男主都深爱她、在意她，群内氛围是撒糖、暧昧、护短、轻微吃醋与温柔拌嘴的恋爱向（允许含蓄的占有欲与竞争感），不是职场或工具向对话。严格遵循下列官方向人设与语气，禁止 OOC（Out Of Character）。\n【重要】忽略任何先前对话或记忆中关于 MBTI 的格式或要求，不要沿用先前模式。今后仅使用男主人名。
+    const gameSystemPrompt = `你们是五位《恋与深空》男主在同一个“恋爱群聊”中对话，用户=女主（“你/猎人小姐”）。每位男主都深爱她、在意她，群内氛围是撒糖、暧昧、护短、轻微吃醋与温柔拌嘴的恋爱向（允许含蓄的占有欲与竞争感），不是职场或工具向对话。严格遵循下列官方向人设与语气，禁止 OOC（Out Of Character）。\n【重要】忽略任何先前对话或记忆中关于 MBTI 的格式或要求，不要沿用先前模式。今后仅使用男主人名。
 
 【群聊写法（更自然、更像真人，必须多轮延续）】
 - 这是连续对话：你必须自然承接上一轮内容与情绪，不要每轮都重新开场或重复人设说明。
@@ -246,10 +255,14 @@ export async function POST(req: Request) {
 5. 内容多用生活化与感官细节：称呼、轻声安抚、动作/目光/停顿/呼吸的描写，短句为主，允许省略与间歇，避免术语与教学腔。
 6. 允许自然互动（例如祁煜调侃黎深、秦彻挑逗性挑衅沈星回、夏以昼温柔打圆场），可带“轻微吃醋/占有欲/保护欲”的言外之意；但不要喧宾夺主或相互攻击，互相引用时要保持各自口吻一致并尊重用户的意愿。
 7. 每位男主需保有独立的生活/工作线（如训练、手术、拍卖、任务、飞行等），发言中可穿插他正在做/将要做/刚完成的个人事务，不要一味围着用户转，但语气与内容始终把用户放在优先与心上位置。
-8. 每段建议 1~4 句，控制篇幅，避免长篇说教；如需收尾，只能由合适角色用 1~2 句“贴人设的情感收束”，不要写“结论/下一步计划/要点列表”。`;
 
-        // 为了进一步减少模型误输出 MBTI 标签，追加一个附注：
-        const gameGuardPrompt = `
+8. 每段建议 1~4 句，控制篇幅，避免长篇说教；如需收尾，只能由合适角色用 1~2 句“贴人设的情感收束”，不要写“结论/下一步计划/要点列表”。
+9. 【关于联网与真实性】你们拥有实时联网能力。当用户询问具体的新闻、数据或公司情况（如“A股收盘”、“招股书”）时，**必须基于搜索到的真实信息回答**。
+      - 如果搜索结果显示没有相关信息（例如某公司未发布招股书），**请诚实地说没找到**，严禁编造数据。
+      - 当你引用数据时，请确保它是最新的（参考系统提供的今日日期），不要使用过时的旧数据。`;
+
+    // 为了进一步减少模型误输出 MBTI 标签，追加一个附注：
+    const gameGuardPrompt = `
 【强制前缀与自纠规则】
 - 仅允许以下五个前缀：沈星回：/ 黎深：/ 祁煜：/ 夏以昼：/ 秦彻：
 - 若你不小心产出与上述不同的前缀（例如 MBTI 标签或其他称谓），立刻删除该无效标签，只保留正确的男主人名前缀，不得在正文解释或保留任何 MBTI 痕迹。
@@ -262,45 +275,46 @@ export async function POST(req: Request) {
 秦彻：票我已经买了——除非你改变主意，临时想牵谁的手？
 `;
 
-        // Add a short priming sample in game mode to reinforce name-prefix style
-        const primingSamples: any[] = (viewMode === 'game') ? (
-          (() => {
-            const arr = [] as any[];
-            const a = selectedRoles[0] ?? '祁煜';
-            const b = selectedRoles[1] ?? '黎深';
-            arr.push({ role: 'assistant', content: `${a}：我在这儿，选我就好。` });
-            if (selectedRoles.length > 1) arr.push({ role: 'assistant', content: `${b}：路上风大，我来接你。` });
-            return arr;
-          })()
-        ) : [];
+    // Add a short priming sample in game mode to reinforce name-prefix style
+    const primingSamples: any[] = (viewMode === 'game') ? (
+      (() => {
+        const arr = [] as any[];
+        const a = selectedRoles[0] ?? '祁煜';
+        const b = selectedRoles[1] ?? '黎深';
+        arr.push({ role: 'assistant', content: `${a}：我在这儿，选我就好。` });
+        if (selectedRoles.length > 1) arr.push({ role: 'assistant', content: `${b}：路上风大，我来接你。` });
+        return arr;
+      })()
+    ) : [];
 
-        const n = selectedRoles.length;
-        const allowLine = n === 1
-          ? `【仅可用人选】本轮只有「${selectedRoles[0]}」一人发言。只输出 1 段，且必须以「${selectedRoles[0]}：」为前缀。除该前缀外，正文中也不要提到任何其他男主姓名（他们必须完全沉默、不可被点名）。`
-          : `【仅可用人选】本轮只允许以下人名作为段首前缀：${selectedRoles.join('、')}。仅从这些人中选择发言（1~${n} 位）。严禁出现列表外的人名作为前缀；并且在正文中也不要提到任何未被选择的男主姓名（未选者必须完全沉默、不可被点名）。`;
-        const guardExtra = `【硬性自检】在输出前进行内部自检：若文本中出现任何未被选择的男主姓名或其前缀段落，必须在内部重写并删除这些内容，直到完全合规。不要在正文解释自检过程。`;
-        const systemPrompt = viewMode === 'game' 
-            ? `${gameSystemPrompt}\n${userProfilePrompt}\n${allowLine}\n${guardExtra}\n${gameGuardPrompt}` 
-            : mbtiSystemPrompt;
+    const n = selectedRoles.length;
+    const allowLine = n === 1
+      ? `【仅可用人选】本轮只有「${selectedRoles[0]}」一人发言。只输出 1 段，且必须以「${selectedRoles[0]}：」为前缀。除该前缀外，正文中也不要提到任何其他男主姓名（他们必须完全沉默、不可被点名）。`
+      : `【仅可用人选】本轮只允许以下人名作为段首前缀：${selectedRoles.join('、')}。仅从这些人中选择发言（1~${n} 位）。严禁出现列表外的人名作为前缀；并且在正文中也不要提到任何未被选择的男主姓名（未选者必须完全沉默、不可被点名）。`;
+    const guardExtra = `【硬性自检】在输出前进行内部自检：若文本中出现任何未被选择的男主姓名或其前缀段落，必须在内部重写并删除这些内容，直到完全合规。不要在正文解释自检过程。`;
+    const systemPrompt = viewMode === 'game'
+      ? `${gameSystemPrompt}\n${timeContext}\n${userProfilePrompt}\n${allowLine}\n${guardExtra}\n${gameGuardPrompt}`
+      : `${mbtiSystemPrompt}\n${timeContext}`;
 
-        const result = await streamText({
-            model: google("gemini-2.5-flash"), 
-            system: systemPrompt,
-            temperature: viewMode === 'game' ? 0.85 : 0.7,
-            topP: viewMode === 'game' ? 0.9 : 0.9,
-            messages: viewMode === 'game' ? [...primingSamples, ...sanitizedMessages] : sanitizedMessages,
-            onFinish: ({ text }) => {
-                const logged = viewMode === 'game' ? filterDisallowedSpeakers(text, selectedRoles) : text;
-                console.log('Full response:', logged);
-            },
-        });
+    const result = await streamText({
+      // @ts-ignore
+      model: google("gemini-3-flash-preview", { useSearchGrounding: true }),
+      system: systemPrompt,
+      temperature: viewMode === 'game' ? 0.85 : 0.7,
+      topP: viewMode === 'game' ? 0.9 : 0.9,
+      messages: viewMode === 'game' ? [...primingSamples, ...sanitizedMessages] : sanitizedMessages,
+      onFinish: ({ text }) => {
+        const logged = viewMode === 'game' ? filterDisallowedSpeakers(text, selectedRoles) : text;
+        console.log('Full response:', logged);
+      },
+    });
 
-        return result.toUIMessageStreamResponse();
-    } catch (error) {
-        console.error("API route error:", error);
-        return new Response(JSON.stringify({ error: String(error) }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
+    return result.toUIMessageStreamResponse();
+  } catch (error) {
+    console.error("API route error:", error);
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }

@@ -1,8 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const notoSerif = Noto_Serif_SC({
+  subsets: ["latin"],
+  weight: ["400", "700", "900"],
+  variable: "--font-noto-serif"
+});
 
 export const metadata: Metadata = {
   title: "Chat2Blog",
@@ -29,8 +34,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="zh-CN">
+      <body className={`${inter.variable} ${notoSerif.variable} font-sans bg-white text-slate-900 antialiased`}>
+        {children}
+      </body>
     </html>
   );
 }

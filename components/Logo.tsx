@@ -14,14 +14,14 @@ export const Logo = ({ className = "w-8 h-8", showText = true }: { className?: s
           d="M44 24C44 35.0457 35.0457 44 24 44C19.27 44 14.92 42.36 11.5 39.5L4 44L6.5 35.5C2.5 32.3 0 28.4 0 24C0 12.9543 8.9543 4 20 4H28C36.8366 4 44 11.1634 44 20V24Z"
           fill="url(#paint0_linear)"
         />
-        
+
         {/* Document Lines inside */}
         <rect x="12" y="16" width="24" height="3" rx="1.5" fill="white" fillOpacity="0.9" />
         <rect x="12" y="24" width="16" height="3" rx="1.5" fill="white" fillOpacity="0.9" />
         <rect x="12" y="32" width="20" height="3" rx="1.5" fill="white" fillOpacity="0.9" />
 
         {/* Pen tip hint (optional, maybe too complex for small size) */}
-        
+
         <defs>
           <linearGradient
             id="paint0_linear"
@@ -40,7 +40,7 @@ export const Logo = ({ className = "w-8 h-8", showText = true }: { className?: s
     {showText && (
       <div className="flex flex-col leading-none">
         <span className="font-bold text-lg tracking-tight text-emerald-950">
-          Chat<span className="text-emerald-500">2</span>Blog
+          chat<span className="text-emerald-500">2</span>blog
         </span>
       </div>
     )}

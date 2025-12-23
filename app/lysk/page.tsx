@@ -1,3 +1,3 @@
 "use client";
-import Home from "../page";
-export default Home;
+import ChatApp from "@/components/ChatApp";
+export default ChatApp;

@@ -5,22 +5,87 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 兼容 Tailwind v4 的 CSS 变量定义方式 */
+:root {
+  --font-serif: var(--font-noto-serif), serif;
+  --font-sans: var(--font-inter), sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 文艺范儿 Markdown 排版核心样式 - 极致紧凑版 */
+.artistic-prose {
+  font-family: var(--font-noto-serif), serif !important;
+  line-height: 1.55 !important;
+  color: #374151 !important;
+  font-size: 0.95rem !important;
+}
+
+.artistic-prose h1,
+.artistic-prose h2,
+.artistic-prose h3 {
+  font-family: var(--font-noto-serif), serif !important;
+  font-weight: 900 !important;
+  color: #1a1a1a !important;
+  margin-top: 1.2em !important;
+  margin-bottom: 0.5em !important;
+  letter-spacing: -0.01em !important;
+}
+
+.artistic-prose h1 {
+  font-size: 2rem !important;
+}
+
+.artistic-prose h2 {
+  font-size: 1.4rem !important;
+  border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+  padding-bottom: 0.2em;
+}
+
+.artistic-prose h3 {
+  font-size: 1.15rem !important;
+  border-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+.artistic-prose p {
+  margin-bottom: 0.8rem !important;
+  opacity: 0.95;
+}
+
+.artistic-prose blockquote {
+  border-left: 3px solid #10b981 !important;
+  padding: 0.75rem 1rem !important;
+  font-style: italic !important;
+  color: #4b5563 !important;
+  margin: 1rem 0 !important;
+  background: rgba(16, 185, 129, 0.04) !important;
+  border-radius: 4px !important;
+  font-size: 0.9rem;
+}
+
+.artistic-prose ul,
+.artistic-prose ol {
+  margin-bottom: 1rem !important;
+  padding-left: 1.25rem !important;
+  list-style-position: inside;
+}
+
+.artistic-prose li {
+  margin-bottom: 0.4rem !important;
+  padding-left: 0.25rem;
+}
+
+.artistic-prose strong {
+  color: #10b981 !important;
+  font-weight: 700 !important;
+}
+
+.artistic-prose hr {
+  margin: 2rem 0 !important;
+  border: none !important;
+  border-top: 1px dashed rgba(16, 185, 129, 0.1) !important;
 }
