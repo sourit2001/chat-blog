@@ -108,26 +108,26 @@ export default function BlogDetailPage() {
     if (!post) return null;
 
     return (
-        <div className="min-h-screen bg-[#fcfaf2] text-[#2c3e50] font-serif selection:bg-emerald-100 selection:text-emerald-900">
+        <div className="min-h-screen bg-[#151515] text-[#a3a3a3] font-serif selection:bg-emerald-900/30 selection:text-emerald-400">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 h-20 bg-[#fcfaf2]/80 backdrop-blur-xl border-b border-emerald-900/5 z-50 px-6 md:px-12 flex items-center justify-between">
+            <header className="fixed top-0 left-0 right-0 h-20 bg-[#151515]/80 backdrop-blur-xl border-b border-white/5 z-50 px-6 md:px-12 flex items-center justify-between">
                 <div className="flex items-center gap-6">
                     <button
                         onClick={() => router.back()}
-                        className="p-3 hover:bg-emerald-900/5 rounded-full transition-all group"
+                        className="p-3 hover:bg-white/5 rounded-full transition-all group"
                     >
-                        <ArrowLeft className="w-5 h-5 text-emerald-900/60 group-hover:text-emerald-900" />
+                        <ArrowLeft className="w-5 h-5 text-[#a3a3a3] group-hover:text-white" />
                     </button>
-                    <div className="h-6 w-px bg-emerald-900/10" />
-                    <Logo className="w-8 h-8 opacity-80" showText={true} />
+                    <div className="h-6 w-px bg-white/10" />
+                    <Logo className="w-8 h-8 opacity-90 invert" showText={true} />
                 </div>
                 <div className="flex gap-4">
                     <button
                         onClick={handleShare}
-                        className="p-3 hover:bg-emerald-900/5 rounded-full text-emerald-900/40 hover:text-emerald-900 transition-all flex items-center gap-2"
+                        className="p-3 hover:bg-white/5 rounded-full text-[#a3a3a3] hover:text-white transition-all flex items-center gap-2"
                         title="分享文章"
                     >
-                        {isCopied ? <span className="text-xs font-sans font-medium text-emerald-600">已复制</span> : null}
+                        {isCopied ? <span className="text-xs font-sans font-medium text-emerald-400">已复制</span> : null}
                         <Share2 className="w-5 h-5" />
                     </button>
                 </div>
@@ -146,19 +146,19 @@ export default function BlogDetailPage() {
                             transition={{ duration: 0.6 }}
                         >
                             <div className="flex items-center justify-center gap-3 mb-4 opacity-30">
-                                <div className="h-px w-8 bg-emerald-900" />
-                                <Feather className="w-4 h-4" />
-                                <div className="h-px w-8 bg-emerald-900" />
+                                <div className="h-px w-8 bg-emerald-500" />
+                                <Feather className="w-4 h-4 text-emerald-500" />
+                                <div className="h-px w-8 bg-emerald-500" />
                             </div>
-                            <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-[#1a1a1a] mb-4 leading-tight">
+                            <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-[#e5e5e5] mb-4 leading-tight">
                                 {post.title}
                             </h1>
-                            <div className="flex items-center justify-center gap-4 text-sm font-medium text-emerald-900/40 tracking-widest uppercase">
+                            <div className="flex items-center justify-center gap-4 text-sm font-medium text-[#a3a3a3] tracking-widest uppercase">
                                 <span className="flex items-center gap-1.5">
-                                    <Clock className="w-4 h-4" />
+                                    <Clock className="w-4 h-4 text-emerald-500/80" />
                                     {new Date(post.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
                                 </span>
-                                <span>•</span>
+                                <span className="text-white/20">•</span>
                                 <span>AI 灵感协作</span>
                             </div>
                         </motion.div>
@@ -169,14 +169,14 @@ export default function BlogDetailPage() {
                     </div>
 
                     {/* Interaction Section */}
-                    <div className="border-t border-emerald-900/5 pt-10 mt-10">
+                    <div className="border-t border-white/5 pt-10 mt-10">
                         <div className="flex flex-col items-center gap-8">
                             <div className="flex items-center gap-6">
                                 <button
                                     onClick={handleLike}
-                                    className={`group flex flex-col items-center gap-2 transition-all ${isLiked ? 'text-red-500' : 'text-emerald-900/40 hover:text-red-500'}`}
+                                    className={`group flex flex-col items-center gap-2 transition-all ${isLiked ? 'text-red-500' : 'text-[#a3a3a3] hover:text-red-400'}`}
                                 >
-                                    <div className={`p-4 rounded-full transition-all ${isLiked ? 'bg-red-50' : 'bg-emerald-900/5 group-hover:bg-red-50'}`}>
+                                    <div className={`p-4 rounded-full transition-all ${isLiked ? 'bg-red-500/10' : 'bg-white/5 group-hover:bg-red-500/10'}`}>
                                         <Heart className={`w-8 h-8 transition-transform ${isLiked ? 'fill-current scale-110' : 'scale-100 group-hover:scale-110'}`} />
                                     </div>
                                     <span className="text-sm font-medium font-sans">{likes} 喜欢</span>
@@ -184,9 +184,9 @@ export default function BlogDetailPage() {
 
                                 <button
                                     onClick={() => setShowComments(!showComments)}
-                                    className={`group flex flex-col items-center gap-2 transition-all ${showComments ? 'text-emerald-900' : 'text-emerald-900/40 hover:text-emerald-900'}`}
+                                    className={`group flex flex-col items-center gap-2 transition-all ${showComments ? 'text-emerald-400' : 'text-[#a3a3a3] hover:text-emerald-400'}`}
                                 >
-                                    <div className={`p-4 rounded-full transition-all ${showComments ? 'bg-emerald-900/10' : 'bg-emerald-900/5 group-hover:bg-emerald-900/10'}`}>
+                                    <div className={`p-4 rounded-full transition-all ${showComments ? 'bg-emerald-500/10' : 'bg-white/5 group-hover:bg-emerald-500/10'}`}>
                                         <MessageSquare className="w-8 h-8" />
                                     </div>
                                     <span className="text-sm font-medium font-sans">{comments.length} 评论</span>
@@ -198,7 +198,7 @@ export default function BlogDetailPage() {
                         {showComments && (
                             <div className="overflow-hidden animate-in fade-in slide-in-from-top-2 duration-500">
                                 <div className="pt-10 max-w-xl mx-auto">
-                                    <h3 className="text-lg font-bold text-emerald-900/80 mb-6 font-sans">
+                                    <h3 className="text-lg font-bold text-[#e5e5e5] mb-6 font-sans">
                                         评论 ({comments.length})
                                     </h3>
 
@@ -206,13 +206,13 @@ export default function BlogDetailPage() {
                                         <textarea
                                             value={newComment}
                                             onChange={(e) => setNewComment(e.target.value)}
-                                            placeholder="写下你的想法..."
-                                            className="w-full min-h-[120px] p-4 pr-14 rounded-2xl bg-white/50 border border-emerald-900/10 focus:border-emerald-900/30 focus:bg-white focus:ring-0 transition-all resize-none font-sans text-sm placeholder:text-emerald-900/30"
+                                            placeholder="写下你的想法... (Enter 换行)"
+                                            className="w-full min-h-[120px] p-4 pr-14 rounded-2xl bg-white/5 border border-white/10 focus:border-emerald-500/50 focus:bg-white/10 focus:ring-0 transition-all resize-none font-sans text-sm text-[#e5e5e5] placeholder:text-white/20"
                                         />
                                         <button
                                             type="submit"
                                             disabled={!newComment.trim()}
-                                            className="absolute bottom-3 right-3 p-2 bg-emerald-900 text-[#fcfaf2] rounded-xl hover:bg-emerald-800 disabled:opacity-50 disabled:hover:bg-emerald-900 transition-all"
+                                            className="absolute bottom-3 right-3 p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 disabled:opacity-50 disabled:hover:bg-emerald-600 transition-all"
                                         >
                                             <Send className="w-4 h-4" />
                                         </button>
@@ -220,19 +220,19 @@ export default function BlogDetailPage() {
 
                                     <div className="space-y-6">
                                         {comments.length === 0 ? (
-                                            <div className="text-center py-8 text-emerald-900/30 text-sm italic">
+                                            <div className="text-center py-8 text-white/20 text-sm italic">
                                                 暂无评论，来坐沙发吧...
                                             </div>
                                         ) : (
                                             comments.map((comment) => (
-                                                <div key={comment.id} className="bg-white/40 p-5 rounded-2xl border border-emerald-900/5">
+                                                <div key={comment.id} className="bg-white/5 p-5 rounded-2xl border border-white/5">
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <span className="font-bold text-emerald-900/70 text-sm font-sans">{comment.author}</span>
-                                                        <span className="text-xs text-emerald-900/30 font-sans">
+                                                        <span className="font-bold text-[#e5e5e5] text-sm font-sans">{comment.author}</span>
+                                                        <span className="text-xs text-white/30 font-sans">
                                                             {new Date(comment.date).toLocaleDateString()}
                                                         </span>
                                                     </div>
-                                                    <p className="text-emerald-900/80 text-sm leading-relaxed whitespace-pre-wrap">
+                                                    <p className="text-[#d4d4d4] text-sm leading-relaxed whitespace-pre-wrap">
                                                         {comment.text}
                                                     </p>
                                                 </div>
@@ -244,11 +244,11 @@ export default function BlogDetailPage() {
                         )}
                     </div>
 
-                    <footer className="mt-12 pt-8 border-t border-emerald-900/5 text-center">
-                        <div className="inline-block p-8 border border-emerald-900/10 rounded-full opacity-10">
-                            <Logo className="w-10 h-10" />
+                    <footer className="mt-12 pt-8 border-t border-white/5 text-center">
+                        <div className="inline-block p-8 border border-white/5 rounded-full opacity-30">
+                            <Logo className="w-10 h-10 invert" />
                         </div>
-                        <p className="mt-8 text-sm text-emerald-900/30">
+                        <p className="mt-8 text-sm text-white/20">
                             阅毕。感悟在此刻共鸣。
                         </p>
                     </footer>

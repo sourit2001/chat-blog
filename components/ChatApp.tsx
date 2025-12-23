@@ -22,52 +22,52 @@ const allMbtiRoles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
 
 const themes = {
   green: {
-    bg: 'from-emerald-50 via-teal-50 to-lime-50',
-    text: 'text-emerald-950',
-    textSub: 'text-emerald-700',
-    accentFrom: 'from-emerald-400',
-    accentTo: 'to-teal-400',
-    button: 'bg-emerald-500 hover:bg-emerald-600 text-white',
-    bubbleUser: 'bg-emerald-500 text-white',
-    bubbleBot: 'bg-white/90 text-emerald-950 border border-emerald-100 shadow shadow-emerald-100/60',
-    inputBg: 'bg-white/85 border border-emerald-100 text-emerald-900 placeholder-emerald-600/70',
-    cardBg: 'bg-white/90 border border-emerald-100 text-emerald-900 shadow shadow-emerald-100/60',
+    bg: 'from-emerald-950 via-teal-950 to-slate-950',
+    text: 'text-emerald-100',
+    textSub: 'text-emerald-400',
+    accentFrom: 'from-emerald-600',
+    accentTo: 'to-teal-600',
+    button: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40',
+    bubbleUser: 'bg-emerald-600 text-white',
+    bubbleBot: 'bg-white/10 text-emerald-50 border border-emerald-500/20 shadow-none backdrop-blur-md',
+    inputBg: 'bg-white/10 border border-emerald-500/20 text-emerald-100 placeholder-emerald-400/50 backdrop-blur-md',
+    cardBg: 'bg-white/5 border border-emerald-500/10 text-emerald-100 shadow-none backdrop-blur-md',
   },
   lavender: {
-    bg: 'from-violet-50 via-purple-50 to-fuchsia-50',
-    text: 'text-violet-950',
-    textSub: 'text-violet-700',
-    accentFrom: 'from-violet-400',
-    accentTo: 'to-purple-400',
-    button: 'bg-violet-500 hover:bg-violet-600 text-white',
-    bubbleUser: 'bg-violet-500 text-white',
-    bubbleBot: 'bg-white/90 text-violet-950 border border-violet-100 shadow shadow-violet-100/60',
-    inputBg: 'bg-white/85 border border-violet-100 text-violet-900 placeholder-violet-600/70',
-    cardBg: 'bg-white/90 border border-violet-100 text-violet-900 shadow shadow-violet-100/60',
+    bg: 'from-violet-950 via-purple-950 to-slate-950',
+    text: 'text-violet-100',
+    textSub: 'text-violet-400',
+    accentFrom: 'from-violet-600',
+    accentTo: 'to-purple-600',
+    button: 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/40',
+    bubbleUser: 'bg-violet-600 text-white',
+    bubbleBot: 'bg-white/10 text-violet-50 border border-violet-500/20 shadow-none backdrop-blur-md',
+    inputBg: 'bg-white/10 border border-violet-500/20 text-violet-100 placeholder-violet-400/50 backdrop-blur-md',
+    cardBg: 'bg-white/5 border border-violet-500/10 text-violet-100 shadow-none backdrop-blur-md',
   },
   pink: {
-    bg: 'from-rose-50 via-pink-50 to-red-50',
-    text: 'text-rose-950',
-    textSub: 'text-rose-700',
-    accentFrom: 'from-rose-400',
-    accentTo: 'to-pink-400',
-    button: 'bg-rose-500 hover:bg-rose-600 text-white',
-    bubbleUser: 'bg-rose-500 text-white',
-    bubbleBot: 'bg-white/90 text-rose-950 border border-rose-100 shadow shadow-rose-100/60',
-    inputBg: 'bg-white/85 border border-rose-100 text-rose-900 placeholder-rose-600/70',
-    cardBg: 'bg-white/90 border border-rose-100 text-rose-900 shadow shadow-rose-100/60',
+    bg: 'from-rose-950 via-pink-950 to-slate-950',
+    text: 'text-rose-100',
+    textSub: 'text-rose-400',
+    accentFrom: 'from-rose-600',
+    accentTo: 'to-pink-600',
+    button: 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/40',
+    bubbleUser: 'bg-rose-600 text-white',
+    bubbleBot: 'bg-white/10 text-rose-50 border border-rose-500/20 shadow-none backdrop-blur-md',
+    inputBg: 'bg-white/10 border border-rose-500/20 text-rose-100 placeholder-rose-400/50 backdrop-blur-md',
+    cardBg: 'bg-white/5 border border-rose-500/10 text-rose-100 shadow-none backdrop-blur-md',
   },
   butter: {
-    bg: 'from-amber-50 via-yellow-50 to-orange-50',
-    text: 'text-amber-950',
-    textSub: 'text-amber-700',
-    accentFrom: 'from-amber-400',
-    accentTo: 'to-yellow-400',
-    button: 'bg-amber-500 hover:bg-amber-600 text-white',
-    bubbleUser: 'bg-amber-500 text-white',
-    bubbleBot: 'bg-white/90 text-amber-950 border border-amber-100 shadow shadow-amber-100/60',
-    inputBg: 'bg-white/85 border border-amber-100 text-amber-900 placeholder-amber-600/70',
-    cardBg: 'bg-white/90 border border-amber-100 text-amber-900 shadow shadow-amber-100/60',
+    bg: 'from-amber-950 via-orange-950 to-slate-950',
+    text: 'text-amber-100',
+    textSub: 'text-amber-400',
+    accentFrom: 'from-amber-600',
+    accentTo: 'to-orange-600',
+    button: 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/40',
+    bubbleUser: 'bg-amber-600 text-white',
+    bubbleBot: 'bg-white/10 text-amber-50 border border-amber-500/20 shadow-none backdrop-blur-md',
+    inputBg: 'bg-white/10 border border-amber-500/20 text-amber-100 placeholder-amber-400/50 backdrop-blur-md',
+    cardBg: 'bg-white/5 border border-amber-500/10 text-amber-100 shadow-none backdrop-blur-md',
   },
 } as const;
 
@@ -1252,7 +1252,7 @@ export default function ChatApp() {
           {/* Interaction mode toggle (visible) */}
           <button
             onClick={() => setInteractionMode(interactionMode === 'voice' ? 'text' : 'voice')}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border border-white/10 bg-white/5 hover:bg-white/10 text-[#e5e5e5]"
             title={interactionMode === 'voice' ? '切换为文字模式' : '切换为语音模式'}
           >
             {interactionMode === 'voice' ? (
@@ -1266,26 +1266,26 @@ export default function ChatApp() {
           {/* Login / User avatar */}
           {userEmail ? (
             <details className="relative">
-              <summary className="list-none inline-flex items-center justify-center h-9 px-3 rounded-full bg-emerald-500 text-white text-sm font-medium shadow cursor-pointer">
+              <summary className="list-none inline-flex items-center justify-center h-9 px-3 rounded-full bg-emerald-600 text-white text-sm font-medium shadow cursor-pointer border border-emerald-500/20">
                 {displayName || '已登录'}
               </summary>
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white/95 shadow-lg border border-white/60 p-2 space-y-1">
-                <div className="px-3 py-1.5 text-[11px] text-gray-600 truncate">已登录：{userEmail}</div>
-                <a href="/history" className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50">我的聊天</a>
-                <button onClick={handleSignOut} className="w-full text-left block px-3 py-2 rounded-lg text-sm hover:bg-red-50 text-red-600">退出登录</button>
+              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-[#1a1a1a]/95 shadow-xl border border-white/10 p-2 space-y-1 backdrop-blur-md">
+                <div className="px-3 py-1.5 text-[11px] text-[#a3a3a3] truncate">已登录：{userEmail}</div>
+                <a href="/history" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-white/5">我的聊天</a>
+                <button onClick={handleSignOut} className="w-full text-left block px-3 py-2 rounded-lg text-sm hover:bg-red-500/10 text-red-400">退出登录</button>
               </div>
             </details>
           ) : (
             <>
               <a
                 href="/login"
-                className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+                className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/10 text-[#e5e5e5] border border-white/10 shadow-sm"
               >
                 登录 / 注册
               </a>
               <a
                 href="/login"
-                className="sm:hidden inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+                className="sm:hidden inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium bg-white/5 hover:bg-white/10 text-[#e5e5e5] border border-white/10 shadow-sm"
               >
                 登录
               </a>
@@ -1294,26 +1294,27 @@ export default function ChatApp() {
           {/* History */}
           <a
             href="/history"
-            className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 hover:bg-white text-gray-800 border border-white/60 shadow-sm"
+            className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/10 text-[#e5e5e5] border border-white/10 shadow-sm"
             title="我的聊天"
           >
             我的聊天
           </a>
           {/* Consolidated menu (all sizes) */}
           <details className="relative z-50">
-            <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-200 shadow cursor-pointer">
-              <Menu className="w-5 h-5 text-gray-800" />
+            <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 shadow cursor-pointer hover:bg-white/10">
+              <Menu className="w-5 h-5 text-[#e5e5e5]" />
             </summary>
-            <div className="absolute right-0 mt-2 w-80 max-h-[75vh] overflow-y-auto overscroll-contain rounded-xl bg-white/95 shadow-lg border border-white/60 p-2 space-y-1">
-              <a href="/mbti" className="block px-3 py-2 rounded-lg text-sm hover:bg-emerald-50">MBTI</a>
-              <a href="/lysk" className="block px-3 py-2 rounded-lg text-sm hover:bg-purple-50">恋与深空</a>
-              <a href="/history" className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50">我的聊天</a>
-              <a href="/login" className="block px-3 py-2 rounded-lg text-sm hover:bg-gray-50">登录</a>
-              <div className="h-px bg-gray-100 my-1" />
-              <div className="px-2 py-1 text-[11px] text-gray-500">快捷操作</div>
+            <div className="absolute right-0 mt-2 w-80 max-h-[75vh] overflow-y-auto overscroll-contain rounded-xl bg-[#1a1a1a]/95 shadow-2xl border border-white/10 p-2 space-y-1 backdrop-blur-md">
+              <a href="/mbti" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-emerald-500/10 hover:text-emerald-400">MBTI</a>
+              <a href="/lysk" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-purple-500/10 hover:text-purple-400">恋与深空</a>
+              <a href="/blog" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-blue-500/10 hover:text-blue-400">博客文章</a>
+              <a href="/history" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-white/5">我的聊天</a>
+              <a href="/login" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-white/5">登录</a>
+              <div className="h-px bg-white/10 my-1" />
+              <div className="px-2 py-1 text-[11px] text-[#737373]">快捷操作</div>
               <button
                 onClick={() => hasMessages && handleCopy()}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hasMessages ? 'hover:bg-gray-50 text-gray-800' : 'text-gray-400 cursor-not-allowed'}`}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hasMessages ? 'hover:bg-white/5 text-[#e5e5e5]' : 'text-[#737373] cursor-not-allowed'}`}
                 disabled={!hasMessages}
               >
                 复制最近回复
@@ -1339,7 +1340,7 @@ export default function ChatApp() {
                     setBlogLoading(false);
                   }
                 }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${hasMessages && !blogLoading ? 'hover:bg-emerald-50 text-emerald-700' : 'text-gray-400 cursor-not-allowed'
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${hasMessages && !blogLoading ? 'hover:bg-emerald-500/10 text-emerald-400' : 'text-[#737373] cursor-not-allowed'
                   }`}
                 disabled={!hasMessages || blogLoading}
               >
@@ -1348,17 +1349,17 @@ export default function ChatApp() {
               </button>
               <button
                 onClick={() => hasMessages && clearChat()}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hasMessages ? 'hover:bg-red-50 text-red-600' : 'text-gray-400 cursor-not-allowed'}`}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hasMessages ? 'hover:bg-red-500/10 text-red-400' : 'text-[#737373] cursor-not-allowed'}`}
                 disabled={!hasMessages}
               >
                 清空聊天
               </button>
-              <div className="h-px bg-gray-100 my-1" />
-              <div className="px-2 py-1 text-[11px] text-gray-500">我的信息（可选）</div>
+              <div className="h-px bg-white/10 my-1" />
+              <div className="px-2 py-1 text-[11px] text-[#737373]">我的信息（可选）</div>
               <div className="px-2 py-1 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="col-span-2">
-                    <div className="text-[11px] text-gray-500 mb-1">人设名（必填，后续对话默认使用这个人设）</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">人设名（必填，后续对话默认使用这个人设）</div>
                     <input
                       value={userPersona.name}
                       onChange={(e) => {
@@ -1367,11 +1368,11 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="例如：小雨 / 阿梨 / 我本人"
-                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                   <div>
-                    <div className="text-[11px] text-gray-500 mb-1">MBTI</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">MBTI</div>
                     <input
                       value={userPersona.mbti}
                       onChange={(e) => {
@@ -1380,11 +1381,11 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="INFP"
-                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                   <div>
-                    <div className="text-[11px] text-gray-500 mb-1">作息</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">作息</div>
                     <input
                       value={userPersona.schedule}
                       onChange={(e) => {
@@ -1393,11 +1394,11 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="晚睡/早起/熬夜党"
-                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                   <div className="col-span-2">
-                    <div className="text-[11px] text-gray-500 mb-1">喜欢吃/偏好</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">喜欢吃/偏好</div>
                     <input
                       value={userPersona.likes}
                       onChange={(e) => {
@@ -1406,11 +1407,11 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="抹茶/辣锅/烤肉（不吃香菜）"
-                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                   <div className="col-span-2">
-                    <div className="text-[11px] text-gray-500 mb-1">工作/学习</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">工作/学习</div>
                     <input
                       value={userPersona.work}
                       onChange={(e) => {
@@ -1419,11 +1420,11 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="互联网产品/学生/自由职业..."
-                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                   <div className="col-span-2">
-                    <div className="text-[11px] text-gray-500 mb-1">雷点/禁忌</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">雷点/禁忌</div>
                     <input
                       value={userPersona.redlines}
                       onChange={(e) => {
@@ -1432,11 +1433,11 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="例如：别叫我MC；别说教；别冷暴力"
-                      className="w-full rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                   <div className="col-span-2">
-                    <div className="text-[11px] text-gray-500 mb-1">补充（可选）</div>
+                    <div className="text-[11px] text-[#a3a3a3] mb-1">补充（可选）</div>
                     <textarea
                       value={userPersona.extras}
                       onChange={(e) => {
@@ -1445,18 +1446,18 @@ export default function ChatApp() {
                         persistUserPersona(next);
                       }}
                       placeholder="想让他们记住的其他细节..."
-                      className="w-full min-h-[70px] resize-y rounded-lg border border-gray-200 bg-white/80 px-2 py-2 text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="w-full min-h-[70px] resize-y rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-gray-400">会自动保存到本机并用于后续聊天</span>
+                  <span className="text-[11px] text-[#737373]">会自动保存到本机并用于后续聊天</span>
                   <button
                     onClick={() => {
                       setUserPersona(emptyPersona);
                       persistUserPersona(emptyPersona);
                     }}
-                    className="px-2 py-1 text-[11px] rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200"
+                    className="px-2 py-1 text-[11px] rounded-md bg-white/10 hover:bg-white/20 border border-white/10 text-[#a3a3a3]"
                   >
                     清空
                   </button>
@@ -1464,25 +1465,25 @@ export default function ChatApp() {
               </div>
               {!fixedMode && (
                 <>
-                  <div className="h-px bg-gray-100 my-1" />
-                  <div className="px-2 py-1 text-[11px] text-gray-500">视图</div>
-                  <button onClick={() => setViewMode('mbti')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode === 'mbti' ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-gray-50'}`}>MBTI</button>
-                  <button onClick={() => setViewMode('game')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode === 'game' ? 'bg-purple-50 text-purple-700' : 'hover:bg-gray-50'}`}>恋与深空</button>
-                  <div className="h-px bg-gray-100 my-1" />
-                  <div className="px-2 py-1 text-[11px] text-gray-500">交互模式</div>
-                  <button onClick={() => setInteractionMode('text')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode === 'text' ? 'bg-gray-100 text-gray-800' : 'hover:bg-gray-50'}`}>文字</button>
-                  <button onClick={() => setInteractionMode('voice')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode === 'voice' ? 'bg-gray-100 text-gray-800' : 'hover:bg-gray-50'}`}>语音</button>
+                  <div className="h-px bg-white/10 my-1" />
+                  <div className="px-2 py-1 text-[11px] text-[#737373]">视图</div>
+                  <button onClick={() => setViewMode('mbti')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode === 'mbti' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-white/5 text-[#e5e5e5]'}`}>MBTI</button>
+                  <button onClick={() => setViewMode('game')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode === 'game' ? 'bg-purple-500/10 text-purple-400' : 'hover:bg-white/5 text-[#e5e5e5]'}`}>恋与深空</button>
+                  <div className="h-px bg-white/10 my-1" />
+                  <div className="px-2 py-1 text-[11px] text-[#737373]">交互模式</div>
+                  <button onClick={() => setInteractionMode('text')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode === 'text' ? 'bg-white/10 text-[#e5e5e5]' : 'hover:bg-white/5 text-[#a3a3a3]'}`}>文字</button>
+                  <button onClick={() => setInteractionMode('voice')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode === 'voice' ? 'bg-white/10 text-[#e5e5e5]' : 'hover:bg-white/5 text-[#a3a3a3]'}`}>语音</button>
                 </>
               )}
               {viewMode === 'game' && (
                 <>
-                  <div className="h-px bg-gray-100 my-1" />
-                  <div className="px-2 py-1 text-[11px] text-gray-500">聊天人选（最多5人）</div>
+                  <div className="h-px bg-white/10 my-1" />
+                  <div className="px-2 py-1 text-[11px] text-[#737373]">聊天人选（最多5人）</div>
                   <div className="px-2 py-1 space-y-1">
                     {allGameRoles.map((r) => {
                       const checked = selectedRoles.includes(r);
                       return (
-                        <label key={r} className="flex items-center gap-2 text-sm">
+                        <label key={r} className="flex items-center gap-2 text-sm text-[#e5e5e5]">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -1496,7 +1497,7 @@ export default function ChatApp() {
                                 }
                               });
                             }}
-                            className="h-3.5 w-3.5 rounded border-gray-300"
+                            className="h-3.5 w-3.5 rounded border-white/20 bg-white/5"
                           />
                           <span>{r}</span>
                         </label>
@@ -1505,29 +1506,29 @@ export default function ChatApp() {
                   </div>
                 </>
               )}
-              <div className="h-px bg-gray-100 my-1" />
-              <div className="px-2 py-1 text-[11px] text-gray-500">主题</div>
-              <div className="flex items-center gap-1 bg-white/60 rounded-full p-1 shadow-inner">
-                <button onClick={() => setTheme('green')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'green' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌿</button>
-                <button onClick={() => setTheme('lavender')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'lavender' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>💜</button>
-                <button onClick={() => setTheme('pink')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'pink' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🌸</button>
-                <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'butter' ? 'bg-white shadow font-medium' : 'hover:bg-white/70'}`}>🧈</button>
+              <div className="h-px bg-white/10 my-1" />
+              <div className="px-2 py-1 text-[11px] text-[#737373]">主题</div>
+              <div className="flex items-center gap-1 bg-white/10 rounded-full p-1 border border-white/10">
+                <button onClick={() => setTheme('green')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'green' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>🌿</button>
+                <button onClick={() => setTheme('lavender')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'lavender' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>💜</button>
+                <button onClick={() => setTheme('pink')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'pink' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>🌸</button>
+                <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'butter' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>🧈</button>
               </div>
             </div>
           </details>
         </div>
       </header>
       {(viewMode === 'game' || viewMode === 'mbti') && (
-        <div className="px-4 py-2 bg-white/80 backdrop-blur border-b border-gray-200">
+        <div className="px-4 py-2 bg-[#1a1a1a]/80 backdrop-blur border-b border-white/5">
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-            <div className="text-sm text-gray-700">
-              <span className="font-medium text-gray-900">当前人设：</span>
+            <div className="text-sm text-[#a3a3a3]">
+              <span className="font-medium text-[#e5e5e5]">当前人设：</span>
               {userPersona?.name?.trim() ? (
-                <span className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                <span className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   {userPersona.name.trim()}
                 </span>
               ) : (
-                <span className="inline-flex items-center px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                <span className="inline-flex items-center px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   未设置（去右上角菜单填写“人设名”）
                 </span>
               )}
@@ -1536,7 +1537,7 @@ export default function ChatApp() {
         </div>
       )}
       {viewMode === 'game' && (
-        <div className="px-4 py-2 bg-white/80 backdrop-blur border-b border-gray-200">
+        <div className="px-4 py-2 bg-[#1a1a1a]/80 backdrop-blur border-b border-white/5">
           <div className="flex items-center justify-between max-w-5xl mx-auto">
             <div className="flex gap-2 flex-wrap">
               {allGameRoles.map((r) => {
@@ -1552,8 +1553,8 @@ export default function ChatApp() {
                       });
                     }}
                     className={`px-3 py-1.5 rounded-full text-sm border ${active
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                      ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
+                      : 'bg-white/5 text-[#a3a3a3] border-white/10 hover:bg-white/10'
                       }`}
                   >
                     {r}
@@ -1562,8 +1563,8 @@ export default function ChatApp() {
               })}
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedRoles([...allGameRoles])} className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200">全选</button>
-              <button onClick={() => setSelectedRoles([])} className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 border border-gray-200">清空</button>
+              <button onClick={() => setSelectedRoles([...allGameRoles])} className="px-2 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[#a3a3a3]">全选</button>
+              <button onClick={() => setSelectedRoles([])} className="px-2 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[#a3a3a3]">清空</button>
             </div>
           </div>
         </div>
@@ -1593,10 +1594,10 @@ export default function ChatApp() {
           if (m.role !== 'assistant' || !hasRoles) {
             return (
               <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow ${m.role === 'user' ? 'bg-gray-400 text-gray-900' : `bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo}`}`}>
+                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow ${m.role === 'user' ? 'bg-white/20 text-white' : `bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo}`}`}>
                   {m.role === 'user' ? <div className="text-xs font-semibold">You</div> : <Sparkles className="w-4 h-4 text-white" />}
                 </div>
-                <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md shadow ${m.role === 'user' ? `${themes[theme].bubbleUser} rounded-tr-none` : `${themes[theme].bubbleBot} rounded-tl-none`}`}>
+                <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md shadow-none ${m.role === 'user' ? `${themes[theme].bubbleUser} rounded-tr-none` : `${themes[theme].bubbleBot} rounded-tl-none`}`}>
                   <div className={`text-sm prose max-w-none ${m.role === 'user' ? 'prose-invert' : ''}`}>
                     <ReactMarkdown>{content}</ReactMarkdown>
                   </div>
@@ -1624,16 +1625,16 @@ export default function ChatApp() {
 
       {/* Blog Preview Panel */}
       {blogDraft && (
-        <div className="border border-gray-200 bg-white shadow-xl p-4 rounded-xl">
+        <div className="border border-white/10 bg-[#1a1a1a] shadow-2xl p-4 rounded-xl">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-gray-800">
-              <FileText className="w-4 h-4 text-emerald-600" />
+            <div className="flex items-center gap-2 text-[#e5e5e5]">
+              <FileText className="w-4 h-4 text-emerald-400" />
               <span className="text-sm font-medium">博客草稿预览</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setBlogDraft(null)}
-                className="px-2 py-1 text-xs rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                className="px-2 py-1 text-xs rounded-md bg-white/5 text-[#a3a3a3] hover:bg-white/10 border border-white/10"
               >关闭</button>
               <button
                 onClick={() => {

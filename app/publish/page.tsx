@@ -49,24 +49,25 @@ export default function PublishPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#fcfaf2] text-[#2c3e50] font-serif selection:bg-emerald-100 selection:text-emerald-900">
+
+        <div className="min-h-screen bg-[#151515] text-[#a3a3a3] font-serif selection:bg-emerald-900/30 selection:text-emerald-400">
             {/* Aesthetic Header */}
-            <header className="fixed top-0 left-0 right-0 h-20 bg-[#fcfaf2]/80 backdrop-blur-xl border-b border-emerald-900/5 z-50 px-6 md:px-12 flex items-center justify-between">
+            <header className="fixed top-0 left-0 right-0 h-20 bg-[#151515]/80 backdrop-blur-xl border-b border-white/5 z-50 px-6 md:px-12 flex items-center justify-between">
                 <div className="flex items-center gap-6">
                     <button
                         onClick={() => router.back()}
-                        className="p-3 hover:bg-emerald-900/5 rounded-full transition-all group"
+                        className="p-3 hover:bg-white/5 rounded-full transition-all group"
                     >
-                        <ArrowLeft className="w-5 h-5 text-emerald-900/60 group-hover:text-emerald-900" />
+                        <ArrowLeft className="w-5 h-5 text-[#a3a3a3] group-hover:text-white" />
                     </button>
-                    <div className="h-6 w-px bg-emerald-900/10" />
-                    <Logo className="w-8 h-8 opacity-80" showText={true} />
+                    <div className="h-6 w-px bg-white/10" />
+                    <Logo className="w-8 h-8 opacity-90 invert" showText={true} />
                 </div>
 
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setIsEditing(!isEditing)}
-                        className="hidden md:flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-emerald-900/60 hover:text-emerald-900 hover:bg-emerald-900/5 rounded-full transition-all"
+                        className="hidden md:flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-[#a3a3a3] hover:text-white hover:bg-white/5 rounded-full transition-all"
                     >
                         {isEditing ? <Eye className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
                         {isEditing ? '欣赏模式' : '润色一下'}
@@ -76,8 +77,8 @@ export default function PublishPage() {
                         onClick={handlePublish}
                         disabled={isPublishing || isPublished}
                         className={`flex items-center gap-3 px-8 py-2.5 text-sm font-bold rounded-full transition-all tracking-widest ${isPublished
-                            ? 'bg-emerald-100 text-emerald-700 cursor-default'
-                            : 'bg-emerald-900 text-white hover:bg-emerald-800 active:scale-95 shadow-xl shadow-emerald-900/20'
+                            ? 'bg-emerald-900/30 text-emerald-400 cursor-default border border-emerald-900/50'
+                            : 'bg-white text-black hover:bg-emerald-400 hover:text-black active:scale-95 shadow-xl shadow-white/5'
                             }`}
                     >
                         {isPublishing ? (
@@ -97,7 +98,7 @@ export default function PublishPage() {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="mb-16 p-8 bg-emerald-900 text-white rounded-[2.5rem] flex items-center justify-between shadow-2xl shadow-emerald-900/30 overflow-hidden relative"
+                        className="mb-16 p-8 bg-gradient-to-br from-emerald-900 to-slate-900 text-white rounded-[2.5rem] flex items-center justify-between shadow-2xl shadow-emerald-900/20 overflow-hidden relative border border-emerald-500/20"
                     >
                         <div className="absolute -right-8 -bottom-8 opacity-10">
                             <Feather className="w-32 h-32 rotate-12" />
@@ -116,21 +117,21 @@ export default function PublishPage() {
                 )}
 
                 {/* The Paper */}
-                <div className={`transition-all duration-700 ${isEditing ? 'bg-white p-8 md:p-16 rounded-3xl shadow-inner border border-emerald-900/5' : ''}`}>
+                <div className={`transition-all duration-700 ${isEditing ? 'bg-white/5 p-8 md:p-16 rounded-3xl shadow-inner border border-white/5' : ''}`}>
                     {isEditing ? (
                         <div className="space-y-8">
                             <input
                                 value={blogTitle}
                                 onChange={(e) => setBlogTitle(e.target.value)}
                                 placeholder="在此处题字..."
-                                className="w-full text-5xl font-black tracking-tighter border-none focus:ring-0 placeholder:text-emerald-900/10 bg-transparent"
+                                className="w-full text-5xl font-black tracking-tighter border-none focus:ring-0 placeholder:text-white/10 bg-transparent text-[#e5e5e5]"
                             />
-                            <div className="w-20 h-1.5 bg-emerald-900 rounded-full" />
+                            <div className="w-20 h-1.5 bg-emerald-500 rounded-full" />
                             <textarea
                                 value={blogContent}
                                 onChange={(e) => setBlogContent(e.target.value)}
                                 placeholder="笔耕不辍，思绪万千..."
-                                className="w-full min-h-[600px] text-xl leading-[2] border-none focus:ring-0 placeholder:text-emerald-900/10 bg-transparent resize-none"
+                                className="w-full min-h-[600px] text-xl leading-[2] border-none focus:ring-0 placeholder:text-white/10 bg-transparent resize-none text-[#d4d4d4]"
                             />
                         </div>
                     ) : (
@@ -142,16 +143,16 @@ export default function PublishPage() {
                                     transition={{ duration: 0.6 }}
                                 >
                                     <div className="flex items-center justify-center gap-3 mb-4 opacity-30">
-                                        <div className="h-px w-8 bg-emerald-900" />
-                                        <Feather className="w-4 h-4" />
-                                        <div className="h-px w-8 bg-emerald-900" />
+                                        <div className="h-px w-8 bg-emerald-500" />
+                                        <Feather className="w-4 h-4 text-emerald-500" />
+                                        <div className="h-px w-8 bg-emerald-500" />
                                     </div>
-                                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-[#1a1a1a] mb-4 leading-tight">
+                                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-[#e5e5e5] mb-4 leading-tight">
                                         {blogTitle || '无题'}
                                     </h1>
-                                    <div className="flex items-center justify-center gap-3 text-sm font-medium text-emerald-900/40 tracking-widest uppercase">
+                                    <div className="flex items-center justify-center gap-3 text-sm font-medium text-[#a3a3a3] tracking-widest uppercase">
                                         <span>文 / AI 创作者</span>
-                                        <span>•</span>
+                                        <span className="text-white/20">•</span>
                                         <span>{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                     </div>
                                 </motion.div>
@@ -161,11 +162,11 @@ export default function PublishPage() {
                                 <ReactMarkdown>{blogContent}</ReactMarkdown>
                             </div>
 
-                            <footer className="mt-12 pt-8 border-t border-emerald-900/5 text-center">
-                                <div className="inline-block p-8 border border-emerald-900/10 rounded-full opacity-10">
-                                    <Logo className="w-10 h-10" />
+                            <footer className="mt-12 pt-8 border-t border-white/5 text-center">
+                                <div className="inline-block p-8 border border-white/5 rounded-full opacity-30">
+                                    <Logo className="w-10 h-10 invert" />
                                 </div>
-                                <p className="mt-8 text-sm text-emerald-900/30 flex items-center justify-center gap-2">
+                                <p className="mt-8 text-sm text-white/20 flex items-center justify-center gap-2">
                                     <Share2 className="w-4 h-4" />
                                     分享这篇文章的共鸣
                                 </p>
@@ -178,7 +179,7 @@ export default function PublishPage() {
             {/* Floating Action for Mobile */}
             <button
                 onClick={() => setIsEditing(!isEditing)}
-                className="md:hidden fixed bottom-10 right-10 w-16 h-16 bg-emerald-900 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all z-50 ring-8 ring-[#fcfaf2]"
+                className="md:hidden fixed bottom-10 right-10 w-16 h-16 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all z-50 ring-8 ring-[#151515]"
             >
                 {isEditing ? <Eye className="w-6 h-6" /> : <Feather className="w-6 h-6" />}
             </button>

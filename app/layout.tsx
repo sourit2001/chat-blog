@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className={`${inter.variable} ${notoSerif.variable} font-sans bg-white text-slate-900 antialiased`}>
+      <body className={`${inter.variable} ${notoSerif.variable} font-sans bg-[#151515] text-[#e5e5e5] antialiased`}>
         {children}
       </body>
     </html>

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #151515;
+  --foreground: #e5e5e5;
 }
 
 /* 兼容 Tailwind v4 的 CSS 变量定义方式 */
@@ -16,76 +16,81 @@ body {
   color: var(--foreground);
 }
 
-/* 文艺范儿 Markdown 排版核心样式 - 极致紧凑版 */
+/* 文艺范儿 Markdown 排版核心样式 - 深色知性版 */
 .artistic-prose {
   font-family: var(--font-noto-serif), serif !important;
-  line-height: 1.55 !important;
-  color: #374151 !important;
-  font-size: 0.95rem !important;
+  line-height: 1.7 !important;
+  color: #a3a3a3 !important;
+  /* Neutral-400 */
+  font-size: 1rem !important;
 }
 
 .artistic-prose h1,
 .artistic-prose h2,
 .artistic-prose h3 {
   font-family: var(--font-noto-serif), serif !important;
-  font-weight: 900 !important;
-  color: #1a1a1a !important;
-  margin-top: 1.2em !important;
-  margin-bottom: 0.5em !important;
-  letter-spacing: -0.01em !important;
+  font-weight: 800 !important;
+  color: #e5e5e5 !important;
+  /* Neutral-200 */
+  margin-top: 1.5em !important;
+  margin-bottom: 0.8em !important;
+  letter-spacing: -0.02em !important;
 }
 
 .artistic-prose h1 {
-  font-size: 2rem !important;
+  font-size: 2.2rem !important;
 }
 
 .artistic-prose h2 {
-  font-size: 1.4rem !important;
-  border-bottom: 1px solid rgba(16, 185, 129, 0.1);
-  padding-bottom: 0.2em;
+  font-size: 1.5rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.3em;
 }
 
 .artistic-prose h3 {
-  font-size: 1.15rem !important;
+  font-size: 1.25rem !important;
   border-left: 0 !important;
   padding-left: 0 !important;
 }
 
 .artistic-prose p {
-  margin-bottom: 0.8rem !important;
-  opacity: 0.95;
+  margin-bottom: 1.2rem !important;
+  opacity: 1;
 }
 
 .artistic-prose blockquote {
-  border-left: 3px solid #10b981 !important;
+  border-left: 3px solid #34d399 !important;
+  /* Emerald-400 */
   padding: 0.75rem 1rem !important;
   font-style: italic !important;
-  color: #4b5563 !important;
-  margin: 1rem 0 !important;
-  background: rgba(16, 185, 129, 0.04) !important;
+  color: #d1d5db !important;
+  /* Gray-300 */
+  margin: 1.5rem 0 !important;
+  background: rgba(52, 211, 153, 0.05) !important;
   border-radius: 4px !important;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .artistic-prose ul,
 .artistic-prose ol {
-  margin-bottom: 1rem !important;
+  margin-bottom: 1.2rem !important;
   padding-left: 1.25rem !important;
   list-style-position: inside;
 }
 
 .artistic-prose li {
-  margin-bottom: 0.4rem !important;
+  margin-bottom: 0.5rem !important;
   padding-left: 0.25rem;
 }
 
 .artistic-prose strong {
-  color: #10b981 !important;
+  color: #34d399 !important;
+  /* Emerald-400 */
   font-weight: 700 !important;
 }
 
 .artistic-prose hr {
-  margin: 2rem 0 !important;
+  margin: 3rem 0 !important;
   border: none !important;
-  border-top: 1px dashed rgba(16, 185, 129, 0.1) !important;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15) !important;
 }
