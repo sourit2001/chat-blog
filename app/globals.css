@@ -1,38 +1,61 @@
 @import "tailwindcss";
 
 :root {
-  --background: #151515;
-  --foreground: #e5e5e5;
-}
-
-/* 兼容 Tailwind v4 的 CSS 变量定义方式 */
-:root {
+  /* Common Fonts */
   --font-serif: var(--font-noto-serif), serif;
   --font-sans: var(--font-inter), sans-serif;
+
+  /* Light Theme Tokens (Traditional Paper Style) */
+  --bg-page: #F6F5F3;
+  /* 主背景：纸感灰白 */
+  --bg-panel: #FFFFFF;
+  /* 卡片 / 群聊区 */
+  --bg-hover: #ECEDEC;
+  /* hover / 轻提示 */
+  --text-primary: #1F2328;
+  /* 正文 */
+  --text-secondary: #6B7280;
+  /* 次要说明 */
+  --text-tertiary: #A89F94;
+  /* 时间 / meta */
+  --border-light: #E5E6E4;
+  --accent-main: #4F6F73;
+}
+
+/* Dark Theme Tokens (Elegant Night Style) */
+[data-theme='dark'] {
+  --bg-page: #1E1F1D;
+  --bg-panel: #262724;
+  --bg-hover: #2E302C;
+  --text-primary: #E6E7E5;
+  --text-secondary: #9FA3A0;
+  --text-tertiary: #7A7E7A;
+  --border-light: #333633;
+  --accent-main: #7FA6A1;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  transition: background-color 0.3s, color 0.3s;
 }
 
-/* 文艺范儿 Markdown 排版核心样式 - 深色知性版 */
+/* 文艺范儿 Markdown 排版核心样式 */
 .artistic-prose {
-  font-family: var(--font-noto-serif), serif !important;
-  line-height: 1.7 !important;
-  color: #a3a3a3 !important;
-  /* Neutral-400 */
-  font-size: 1rem !important;
+  font-family: var(--font-serif) !important;
+  line-height: 1.8 !important;
+  color: var(--text-primary) !important;
+  font-size: 1.05rem !important;
 }
 
 .artistic-prose h1,
 .artistic-prose h2,
 .artistic-prose h3 {
-  font-family: var(--font-noto-serif), serif !important;
+  font-family: var(--font-serif) !important;
   font-weight: 800 !important;
-  color: #e5e5e5 !important;
-  /* Neutral-200 */
-  margin-top: 1.5em !important;
+  color: var(--text-primary) !important;
+  margin-top: 1.8em !important;
   margin-bottom: 0.8em !important;
   letter-spacing: -0.02em !important;
 }
@@ -42,55 +65,41 @@ body {
 }
 
 .artistic-prose h2 {
-  font-size: 1.5rem !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 0.3em;
-}
-
-.artistic-prose h3 {
-  font-size: 1.25rem !important;
-  border-left: 0 !important;
-  padding-left: 0 !important;
-}
-
-.artistic-prose p {
-  margin-bottom: 1.2rem !important;
-  opacity: 1;
+  font-size: 1.6rem !important;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 0.4em;
 }
 
 .artistic-prose blockquote {
-  border-left: 3px solid #34d399 !important;
-  /* Emerald-400 */
-  padding: 0.75rem 1rem !important;
+  border-left: 3px solid var(--accent-main) !important;
+  padding: 0.75rem 1.25rem !important;
   font-style: italic !important;
-  color: #d1d5db !important;
-  /* Gray-300 */
-  margin: 1.5rem 0 !important;
-  background: rgba(52, 211, 153, 0.05) !important;
+  color: var(--text-secondary) !important;
+  margin: 2rem 0 !important;
+  background: var(--bg-hover) !important;
   border-radius: 4px !important;
-  font-size: 0.95rem;
-}
-
-.artistic-prose ul,
-.artistic-prose ol {
-  margin-bottom: 1.2rem !important;
-  padding-left: 1.25rem !important;
-  list-style-position: inside;
-}
-
-.artistic-prose li {
-  margin-bottom: 0.5rem !important;
-  padding-left: 0.25rem;
 }
 
 .artistic-prose strong {
-  color: #34d399 !important;
-  /* Emerald-400 */
+  color: var(--accent-main) !important;
   font-weight: 700 !important;
 }
 
 .artistic-prose hr {
   margin: 3rem 0 !important;
   border: none !important;
-  border-top: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  border-top: 1px dashed var(--border-light) !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 10px;
 }

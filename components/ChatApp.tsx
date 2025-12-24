@@ -2,13 +2,19 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText, Download, Volume2, Loader2, Globe } from "lucide-react";
+import {
+  Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
+  Download, Volume2, Loader2, Globe, LayoutGrid, Users, History,
+  Settings, ChevronDown, ChevronRight, MessageCircle, PenTool, Palette,
+  UserCircle, Plus
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import AudioVisualizer from "@/components/AudioVisualizer";
 import ReactMarkdown from "react-markdown";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Logo } from "@/components/Logo";
+import Link from 'next/link';
 
 type ParsedMbtiReply = {
   intro: string;
@@ -21,55 +27,332 @@ type InteractionMode = 'text' | 'voice';
 const allMbtiRoles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
 
 const themes = {
-  green: {
-    bg: 'from-emerald-950 via-teal-950 to-slate-950',
-    text: 'text-emerald-100',
-    textSub: 'text-emerald-400',
-    accentFrom: 'from-emerald-600',
-    accentTo: 'to-teal-600',
-    button: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40',
-    bubbleUser: 'bg-emerald-600 text-white',
-    bubbleBot: 'bg-white/10 text-emerald-50 border border-emerald-500/20 shadow-none backdrop-blur-md',
-    inputBg: 'bg-white/10 border border-emerald-500/20 text-emerald-100 placeholder-emerald-400/50 backdrop-blur-md',
-    cardBg: 'bg-white/5 border border-emerald-500/10 text-emerald-100 shadow-none backdrop-blur-md',
+  emerald: {
+    name: '生机翠',
+    bg: 'bg-[#F0FDF4]',
+    pageBg: '#F0FDF4',
+    text: 'text-slate-900',
+    accent: '#10B981',
+    button: 'bg-[#10B981] hover:bg-[#059669] text-white shadow-lg shadow-emerald-500/20',
+    bubbleUser: 'bg-[#10B981]/80 backdrop-blur-xl text-white shadow-xl shadow-emerald-500/10 border border-white/20',
+    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
+    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
   },
-  lavender: {
-    bg: 'from-violet-950 via-purple-950 to-slate-950',
-    text: 'text-violet-100',
-    textSub: 'text-violet-400',
-    accentFrom: 'from-violet-600',
-    accentTo: 'to-purple-600',
-    button: 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/40',
-    bubbleUser: 'bg-violet-600 text-white',
-    bubbleBot: 'bg-white/10 text-violet-50 border border-violet-500/20 shadow-none backdrop-blur-md',
-    inputBg: 'bg-white/10 border border-violet-500/20 text-violet-100 placeholder-violet-400/50 backdrop-blur-md',
-    cardBg: 'bg-white/5 border border-violet-500/10 text-violet-100 shadow-none backdrop-blur-md',
+  indigo: {
+    name: '极光紫',
+    bg: 'bg-[#F5F3FF]',
+    pageBg: '#F5F3FF',
+    text: 'text-slate-900',
+    accent: '#6366F1',
+    button: 'bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-lg shadow-indigo-500/20',
+    bubbleUser: 'bg-[#6366F1]/80 backdrop-blur-xl text-white shadow-xl shadow-indigo-500/10 border border-white/20',
+    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
+    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
   },
-  pink: {
-    bg: 'from-rose-950 via-pink-950 to-slate-950',
-    text: 'text-rose-100',
-    textSub: 'text-rose-400',
-    accentFrom: 'from-rose-600',
-    accentTo: 'to-pink-600',
-    button: 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/40',
-    bubbleUser: 'bg-rose-600 text-white',
-    bubbleBot: 'bg-white/10 text-rose-50 border border-rose-500/20 shadow-none backdrop-blur-md',
-    inputBg: 'bg-white/10 border border-rose-500/20 text-rose-100 placeholder-rose-400/50 backdrop-blur-md',
-    cardBg: 'bg-white/5 border border-rose-500/10 text-rose-100 shadow-none backdrop-blur-md',
+  rose: {
+    name: '晚霞粉',
+    bg: 'bg-[#FFF1F2]',
+    pageBg: '#FFF1F2',
+    text: 'text-slate-900',
+    accent: '#F43F5E',
+    button: 'bg-[#F43F5E] hover:bg-[#E11D48] text-white shadow-lg shadow-rose-500/20',
+    bubbleUser: 'bg-[#F43F5E]/80 backdrop-blur-xl text-white shadow-xl shadow-rose-500/10 border border-white/20',
+    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
+    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
   },
-  butter: {
-    bg: 'from-amber-950 via-orange-950 to-slate-950',
-    text: 'text-amber-100',
-    textSub: 'text-amber-400',
-    accentFrom: 'from-amber-600',
-    accentTo: 'to-orange-600',
-    button: 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/40',
-    bubbleUser: 'bg-amber-600 text-white',
-    bubbleBot: 'bg-white/10 text-amber-50 border border-amber-500/20 shadow-none backdrop-blur-md',
-    inputBg: 'bg-white/10 border border-amber-500/20 text-amber-100 placeholder-amber-400/50 backdrop-blur-md',
-    cardBg: 'bg-white/5 border border-amber-500/10 text-amber-100 shadow-none backdrop-blur-md',
+  amber: {
+    name: '晨晖金',
+    bg: 'bg-[#FFFBEB]',
+    pageBg: '#FFFBEB',
+    text: 'text-slate-900',
+    accent: '#F59E0B',
+    button: 'bg-[#F59E0B] hover:bg-[#D97706] text-white shadow-lg shadow-amber-500/20',
+    bubbleUser: 'bg-[#F59E0B]/80 backdrop-blur-xl text-white shadow-xl shadow-amber-500/10 border border-white/20',
+    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
+    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
   },
 } as const;
+
+const chatBackgrounds = [
+  { id: 'none', name: '极简', url: '' },
+  { id: 'warm', name: '暖风', url: '/backgrounds/warm.png' },
+  { id: 'vibrant', name: '流光', url: '/backgrounds/vibrant.png' },
+  { id: 'cozy', name: '静谧', url: '/backgrounds/cozy.png' },
+  { id: 'rain', name: '听雨', url: '/backgrounds/rain-cozy.png' },
+  { id: 'meadow', name: '听风', url: '/backgrounds/meadow-cozy.png' },
+];
+
+const RainyBackground = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+
+    const bgImage = new Image();
+    bgImage.src = "/backgrounds/rain-cozy.png";
+
+    let animationFrameId: number;
+    let width: number;
+    let height: number;
+
+    interface Drop {
+      x: number;
+      y: number;
+      r: number;
+      v: number;
+      trail: { y: number; r: number }[];
+      stutter: number;
+    }
+
+    interface StaticDrop {
+      x: number;
+      y: number;
+      r: number;
+      opacity: number;
+    }
+
+    const drops: Drop[] = [];
+    const staticDrops: StaticDrop[] = [];
+
+    const init = () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+
+      drops.length = 0;
+      staticDrops.length = 0;
+
+      for (let i = 0; i < 300; i++) {
+        staticDrops.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: 0.5 + Math.random() * 2,
+          opacity: 0.1 + Math.random() * 0.2
+        });
+      }
+
+      for (let i = 0; i < 40; i++) {
+        drops.push(createDrop(true));
+      }
+    };
+
+    const createDrop = (randomY = false) => ({
+      x: Math.random() * width,
+      y: randomY ? Math.random() * height : -20,
+      r: 2 + Math.random() * 3,
+      v: 0.8 + Math.random() * 1.5,
+      trail: [],
+      stutter: Math.random() * 50
+    });
+
+    const draw = () => {
+      // Background
+      if (bgImage.complete) {
+        ctx.drawImage(bgImage, 0, 0, width, height);
+      } else {
+        ctx.fillStyle = '#1a140f';
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      // Static condensation
+      staticDrops.forEach(d => {
+        ctx.fillStyle = `rgba(255, 240, 220, ${d.opacity})`;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Active drops
+      drops.forEach((d, i) => {
+        d.stutter++;
+        if (d.stutter > 15) {
+          d.y += d.v * (0.4 + Math.random() * 0.6);
+          if (Math.random() > 0.96) d.stutter = 0;
+        }
+
+        if (Math.random() > 0.7) {
+          d.trail.push({ y: d.y, r: d.r * 0.7 });
+          if (d.trail.length > 12) d.trail.shift();
+        }
+
+        // Draw trail
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        d.trail.forEach(t => {
+          ctx.beginPath();
+          ctx.arc(d.x, t.y, t.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Refraction logic
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.clip();
+
+        if (bgImage.complete) {
+          const shift = d.r * 1.5;
+          ctx.drawImage(
+            bgImage,
+            (d.x / width) * bgImage.width - shift,
+            (d.y / height) * bgImage.height - shift,
+            d.r * 8, d.r * 8,
+            d.x - d.r * 2, d.y - d.r * 2,
+            d.r * 4, d.r * 4
+          );
+        }
+        ctx.restore();
+
+        // Volume Shading
+        const grad = ctx.createRadialGradient(d.x - d.r * 0.3, d.y - d.r * 0.3, 0, d.x, d.y, d.r);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+        grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.1)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Glint
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(d.x - d.r * 0.3, d.y - d.r * 0.3, d.r * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (d.y > height + 20) drops[i] = createDrop();
+      });
+
+      // Warm overlay
+      ctx.fillStyle = 'rgba(40, 25, 10, 0.15)';
+      ctx.fillRect(0, 0, width, height);
+
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    init();
+    window.addEventListener('resize', init);
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', init);
+    };
+  }, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-[#0a0a0a] -z-20">
+      <canvas ref={canvasRef} className="w-full h-full" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+    </div>
+  );
+};
+
+const MeadowBackground = () => (
+  <div className="absolute inset-0 overflow-hidden bg-[#0d1a0d] -z-20">
+    {/* Base Scene - Healing Meadow Photo with Breathing Animation */}
+    <motion.img
+      src="/backgrounds/meadow-cozy.png"
+      alt="Cozy Meadow at Sunset"
+      initial={{ scale: 1.1, x: "-1%", y: "-1%" }}
+      animate={{
+        scale: [1.1, 1.15, 1.1],
+        x: ["-1%", "0%", "-1%"],
+        y: ["-1%", "0%", "-1%"]
+      }}
+      transition={{
+        duration: 20,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }}
+      className="absolute inset-0 w-full h-full object-cover opacity-80"
+      style={{ filter: 'brightness(0.8) saturate(1.2) blur(0.5px)' }}
+    />
+
+    {/* Flowing Light Rays (Tyndall Effect) */}
+    <motion.div
+      animate={{ opacity: [0.1, 0.3, 0.1], x: [-20, 20, -20] }}
+      transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,200,100,0.15)_0%,transparent_70%)] mix-blend-screen pointer-events-none"
+    />
+
+    {/* Dynamic Wind Streaks */}
+    {[...Array(5)].map((_, i) => (
+      <motion.div
+        key={`meadow-wind-${i}`}
+        initial={{ x: "-100%", y: 20 + Math.random() * 60 + "%", opacity: 0 }}
+        animate={{ x: "200%", opacity: [0, 0.15, 0] }}
+        transition={{
+          duration: 3 + Math.random() * 4,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: Math.random() * 5
+        }}
+        className="absolute w-[600px] h-[100px] bg-gradient-to-r from-transparent via-white/5 to-transparent blur-[40px] -rotate-12 pointer-events-none"
+      />
+    ))}
+
+    {/* Floating Dandelion Particles with Sine Wave Path */}
+    {[...Array(20)].map((_, i) => {
+      const delay = Math.random() * 10;
+      const duration = 12 + Math.random() * 10;
+      return (
+        <motion.div
+          key={`cozy-seed-${i}`}
+          initial={{ x: "-10%", y: 40 + Math.random() * 50 + "%", opacity: 0 }}
+          animate={{
+            x: "110%",
+            y: [(40 + Math.random() * 50) + "%", (30 + Math.random() * 40) + "%", (50 + Math.random() * 40) + "%"],
+            opacity: [0, 1, 0],
+            rotate: [0, 180, 360]
+          }}
+          transition={{
+            duration,
+            repeat: Infinity,
+            ease: "linear",
+            delay
+          }}
+          className="absolute pointer-events-none"
+        >
+          <div className="w-1.5 h-1.5 bg-white rounded-full blur-[0.5px] shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
+          <motion.div
+            animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.5, 0.2] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute inset-[-4px] border border-white/20 rounded-full blur-[1px]"
+          />
+        </motion.div>
+      );
+    })}
+
+    {/* Layered Grass Movement (On top of image) */}
+    <div className="absolute bottom-[-20px] inset-x-0 flex items-end justify-around h-64 pointer-events-none opacity-40">
+      {[...Array(60)].map((_, i) => (
+        <motion.div
+          key={`moving-grass-${i}`}
+          className="w-1.5 bg-emerald-400/20 rounded-t-full origin-bottom blur-[1px]"
+          style={{ height: 80 + Math.random() * 120 + "px" }}
+          animate={{
+            rotate: [5, 20 + Math.random() * 15, 5],
+            skewX: [2, 10 + Math.random() * 5, 2],
+          }}
+          transition={{
+            duration: 2.5 + Math.random() * 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: Math.random() * 2
+          }}
+        />
+      ))}
+    </div>
+
+    {/* Deep Foreground Blur */}
+    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-emerald-950/20 to-transparent backdrop-blur-[1px] pointer-events-none" />
+  </div>
+);
 
 const getRoleEmoji = (role: string, mode: ViewMode) => {
   if (mode === 'game') {
@@ -127,39 +410,8 @@ const getRoleLabel = (role: string, mode: ViewMode) => {
 };
 
 const getRoleAvatarClass = (role: string, mode: ViewMode) => {
-  if (mode === 'game') {
-    // 游戏小队视角下，为五位男主配置偏角色感的颜色
-    switch (role) {
-      case 'ENTJ':
-        return 'from-rose-500 to-orange-500'; // 祁煜：火系、冲劲
-      case 'ISTJ':
-        return 'from-sky-500 to-cyan-500'; // 黎深：冷静、治愈
-      case 'ENFP':
-        return 'from-yellow-300 to-amber-400'; // 沈星回：明亮阳光
-      case 'INFP':
-        return 'from-emerald-300 to-teal-400'; // 夏以昼：柔和治愈
-      case 'ENFJ':
-        return 'from-slate-700 to-violet-700'; // 秦彻：暗色危感
-      default:
-        return 'from-slate-500 to-slate-400';
-    }
-  }
-
-  // MBTI 视角下的默认颜色
-  switch (role) {
-    case 'ENTJ':
-      return 'from-emerald-400 to-emerald-600';
-    case 'ISTJ':
-      return 'from-sky-400 to-cyan-500';
-    case 'ENFP':
-      return 'from-orange-300 to-amber-400';
-    case 'INFP':
-      return 'from-teal-300 to-emerald-400';
-    case 'ENFJ':
-      return 'from-rose-300 to-pink-400';
-    default:
-      return 'from-emerald-400 to-lime-500';
-  }
+  // Use subtle, consistent colors instead of vibrant gradients
+  return 'bg-[var(--bg-hover)]';
 };
 
 const getRoleStatusText = (role: string, mode: ViewMode) => {
@@ -236,14 +488,14 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
   const silentRoles = allowedSlots.filter((r) => !spokenRoles.has(r));
 
   return (
-    <div className={`space-y-3 ${themes[theme].text}`}>
+    <div className={`space-y-4 ${themes[theme].text}`}>
       {parsed.intro && (
         <div className="flex gap-3">
-          <div className="w-9 h-9 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr from-pink-300 to-rose-400 shadow-lg shadow-rose-400/20">
-            <span className="text-base">✨</span>
+          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white/40 backdrop-blur-md shadow-sm">
+            <Sparkles className="w-4 h-4" style={{ color: themes[theme].accent }} />
           </div>
-          <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md rounded-tl-none ${themes[theme].cardBg}`}>
-            <div className="text-sm prose max-w-none">
+          <div className={`p-4 rounded-2xl max-w-[85%] ${themes[theme].cardBg} shadow-sm border border-black/5`}>
+            <div className="text-sm prose max-w-none leading-relaxed text-slate-800">
               <ReactMarkdown>{parsed.intro}</ReactMarkdown>
             </div>
           </div>
@@ -252,19 +504,19 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
 
       {visibleRoles.map((block) => (
         <div key={`${messageId}-${block.role}`} className="flex gap-3">
-          <div className={`w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-tr ${getRoleAvatarClass(block.role, viewMode)} shadow-lg shadow-emerald-300/15`}>
+          <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-black/5`}>
             {viewMode === 'game' ? (
-              <span className="text-[10px] font-semibold leading-none tracking-tight">
+              <span className="text-[10px] font-bold text-slate-400">
                 {getRoleLabel(block.role, viewMode)}
               </span>
             ) : (
-              <span className="text-[22px] leading-none">{getRoleEmoji(block.role, viewMode)}</span>
+              <span className="text-xl">{getRoleEmoji(block.role, viewMode)}</span>
             )}
           </div>
-          <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md rounded-tl-none ${themes[theme].cardBg}`}>
-            <div className="text-sm prose max-w-none">
+          <div className={`p-4 rounded-2xl max-w-[85%] border-l-4 ${themes[theme].cardBg} shadow-md border-black/5`} style={{ borderLeftColor: themes[theme].accent }}>
+            <div className="text-sm prose max-w-none leading-relaxed text-slate-800">
               {getRoleLabel(block.role, viewMode) && (
-                <div className={`${viewMode === 'game' ? 'text-[11px] font-semibold opacity-80' : 'text-[16px] font-extrabold'} mb-1`}>
+                <div className="text-[10px] font-black mb-1 uppercase tracking-[0.2em]" style={{ color: themes[theme].accent }}>
                   {getRoleLabel(block.role, viewMode)}
                 </div>
               )}
@@ -279,18 +531,18 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
           {silentRoles.map((role) => (
             <div
               key={`${messageId}-${role}-status`}
-              className={`flex items-center gap-2 text-xs ${themes[theme].textSub}`}
+              className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400`}
             >
               <div
-                className={`w-7 h-7 rounded-xl flex items-center justify-center bg-gradient-to-tr ${getRoleAvatarClass(role, viewMode)} opacity-50`}
+                className={`w-5 h-5 rounded-full flex items-center justify-center bg-white/60`}
               >
                 {viewMode !== 'game' && (
-                  <span className="text-[14px] leading-none">{getRoleEmoji(role, viewMode)}</span>
+                  <span className="text-[10px]">{getRoleEmoji(role, viewMode)}</span>
                 )}
               </div>
               <span>
                 {getRoleLabel(role, viewMode) && (
-                  <span className="font-medium">{getRoleLabel(role, viewMode)}：</span>
+                  <span>{getRoleLabel(role, viewMode)}：</span>
                 )}
                 {getRoleStatusText(role, viewMode)}
               </span>
@@ -307,6 +559,31 @@ export default function ChatApp() {
   const pathname = usePathname();
   const isRootPath = pathname === '/';
   const [viewMode, setViewMode] = useState<ViewMode>('mbti');
+
+  // --- UI Layout States ---
+  const [isPersonaDrawerOpen, setIsPersonaDrawerOpen] = useState(false);
+  const [isAppearanceDrawerOpen, setIsAppearanceDrawerOpen] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<keyof typeof themes>('emerald');
+  const [selectedBg, setSelectedBg] = useState(chatBackgrounds[0]);
+  const [isChatSubMenuOpen, setIsChatSubMenuOpen] = useState(true);
+
+  // Sync theme to CSS variables
+  useEffect(() => {
+    const root = document.documentElement;
+    const theme = themes[selectedTheme];
+    root.style.setProperty('--bg-page', theme.pageBg);
+    root.style.setProperty('--bg-panel', theme.pageBg);
+    root.style.setProperty('--accent-main', theme.accent);
+
+    // Determine if we need dark or light text based on theme name or common knowledge
+    // For now, all these themes are light-ish backgrounds with dark text
+    root.style.setProperty('--text-primary', '#1F2328');
+    root.style.setProperty('--text-secondary', '#4B5563');
+
+    root.style.setProperty('--bg-hover', `${theme.accent}15`);
+    root.style.setProperty('--border-light', `${theme.accent}20`);
+  }, [selectedTheme]);
+
   const fixedMode: ViewMode | null = pathname?.startsWith('/lysk')
     ? 'game'
     : pathname?.startsWith('/mbti')
@@ -407,7 +684,16 @@ export default function ChatApp() {
   const inputRef = useRef(inputValue);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [sttError, setSttError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<keyof typeof themes>('green');
+  const [theme, setTheme] = useState<keyof typeof themes>('emerald');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Legacy theme mapping fix
+  const activeTheme = selectedTheme;
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
+
   const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1149,217 +1435,397 @@ export default function ChatApp() {
   };
 
   return (
-    <main className={`relative flex flex-col h-[100dvh] overflow-hidden ${themes[theme].text}`}>
-      <div className={`absolute inset-0 -z-10 bg-gradient-to-br ${themes[theme].bg}`} />
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/40 bg-white/60 backdrop-blur-xl z-10 shadow-sm rounded-b-3xl">
-        {/* Left: brand */}
-        <div className="flex items-center gap-2">
-          <Logo className="w-8 h-8" showText={true} />
-          {/* Mobile: current section badge */}
-          <span className="sm:hidden inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/80 text-emerald-800 border border-white/60">
-            {pathname?.startsWith('/lysk') ? '恋与深空' : 'MBTI'}
-          </span>
+    <div className={`relative flex h-[100dvh] w-full overflow-hidden bg-[var(--bg-page)] font-sans ${themes[selectedTheme].text}`}>
+      {/* --- Desktop Sidebar --- */}
+      <aside className="hidden lg:flex flex-col w-64 border-r border-[var(--border-light)] bg-[var(--bg-page)] z-30 transition-all">
+        {/* Top: Logo */}
+        <div className="p-8">
+          <Logo className={`w-8 h-8 opacity-90`} showText={true} />
         </div>
 
-        {/* Center: primary nav (desktop only) */}
-        <nav className="hidden sm:flex items-center gap-1 bg-white/70 rounded-full p-1 shadow-inner text-sm">
-          <a
-            href="/mbti"
-            className={`px-4 py-1.5 rounded-full transition ${pathname?.startsWith('/mbti')
-              ? 'bg-emerald-500 text-white shadow'
-              : 'text-emerald-700 hover:bg-emerald-100'
-              }`}
-          >
-            MBTI
-          </a>
-          <a
-            href="/lysk"
-            className={`px-4 py-1.5 rounded-full transition ${pathname?.startsWith('/lysk')
-              ? 'bg-purple-500 text-white shadow'
-              : 'text-purple-700 hover:bg-purple-100'
-              }`}
-          >
-            恋与深空
-          </a>
-          <a
+        {/* Mid: Creation Section */}
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+          <div className="py-2">
+            <button
+              onClick={() => setIsChatSubMenuOpen(!isChatSubMenuOpen)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--text-primary)]"
+            >
+              <div className="flex items-center gap-3">
+                <MessageCircle className="w-4 h-4 text-[var(--accent-main)]" />
+                <span>创作路径</span>
+              </div>
+              {isChatSubMenuOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronRight className="w-4 h-4 opacity-40" />}
+            </button>
+            <AnimatePresence>
+              {isChatSubMenuOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden mt-1 ml-4 space-y-1"
+                >
+                  <Link
+                    href="/mbti"
+                    className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/mbti' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                  >
+                    · MBTI 创作型
+                  </Link>
+                  <Link
+                    href="/lysk"
+                    className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/lysk' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                  >
+                    · 恋与深空同人
+                  </Link>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <Link
             href="/blog"
-            className={`px-4 py-1.5 rounded-full transition ${pathname?.startsWith('/blog')
-              ? 'bg-slate-800 text-white shadow'
-              : 'text-slate-700 hover:bg-slate-100'
-              }`}
+            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/blog' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
           >
-            我的博客
-          </a>
+            <div className={`w-0.5 h-4 bg-[var(--accent-main)] absolute left-0 ${pathname === '/blog' ? 'opacity-100' : 'opacity-0'}`} />
+            <LayoutGrid className="w-4 h-4" />
+            <span>博客广场</span>
+          </Link>
+
+          <Link
+            href="/blog"
+            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/my-blogs' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+          >
+            <PenTool className="w-4 h-4" />
+            <span>我的博客</span>
+          </Link>
+
+          <div className="h-px bg-[var(--border-light)] my-4 mx-3" />
+
+          <Link
+            href="/history"
+            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/history' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+          >
+            <History className="w-4 h-4" />
+            <span>聊天历史</span>
+          </Link>
         </nav>
 
-        {/* Right: actions */}
-        <div className="flex items-center gap-2">
-          {/* Desktop quick actions */}
-          <div className="hidden sm:flex items-center gap-2">
-            <button
-              onClick={() => hasMessages && handleCopy()}
-              className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'}`}
-              title="Copy last response"
-              disabled={!hasMessages}
-            >
-              {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={async () => {
-                if (!hasMessages) return;
-                try {
-                  setBlogLoading(true);
-                  const res = await fetch('/api/blog', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages }),
-                  });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
-                  setBlogDraft({ title: data.title, markdown: data.markdown });
-                  localStorage.setItem('chat2blog_draft', JSON.stringify({ title: data.title, content: data.markdown }));
-                } catch (e) {
-                  console.error('Blog generation failed', e);
-                  alert('生成博客失败，请重试');
-                } finally {
-                  setBlogLoading(false);
-                }
-              }}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors shadow ${hasMessages
-                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                : 'bg-gray-300 text-white cursor-not-allowed'
-                } disabled:opacity-70`}
-              title="生成博客"
-              disabled={!hasMessages || blogLoading}
-            >
-              {blogLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FileText className="w-4 h-4" />
-              )}
-              <span>生成博客</span>
-            </button>
-            <button
-              onClick={() => hasMessages && clearChat()}
-              className={`p-2 rounded-full transition-colors ${hasMessages ? 'hover:bg-white/20 text-gray-600 hover:text-red-500' : 'text-gray-400 cursor-not-allowed'}`}
-              title="Clear chat"
-              disabled={!hasMessages}
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
-          {/* Interaction mode toggle (visible) */}
+        {/* Bottom: Settings & Modes */}
+        <div className="px-4 py-6 space-y-2 border-t border-[var(--border-light)] bg-[var(--bg-page)]">
           <button
-            onClick={() => setInteractionMode(interactionMode === 'voice' ? 'text' : 'voice')}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border border-white/10 bg-white/5 hover:bg-white/10 text-[#e5e5e5]"
-            title={interactionMode === 'voice' ? '切换为文字模式' : '切换为语音模式'}
+            onClick={() => setIsPersonaDrawerOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
           >
-            {interactionMode === 'voice' ? (
-              <Volume2 className="w-4 h-4" />
-            ) : (
-              <Mic className="w-4 h-4" />
-            )}
-            <span className="hidden sm:inline">{interactionMode === 'voice' ? '语音' : '文字'}</span>
+            <UserCircle className="w-4 h-4" />
+            <span>人设配置</span>
           </button>
 
-          {/* Login / User avatar */}
-          {userEmail ? (
-            <details className="relative">
-              <summary className="list-none inline-flex items-center justify-center h-9 px-3 rounded-full bg-emerald-600 text-white text-sm font-medium shadow cursor-pointer border border-emerald-500/20">
-                {displayName || '已登录'}
-              </summary>
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-[#1a1a1a]/95 shadow-xl border border-white/10 p-2 space-y-1 backdrop-blur-md">
-                <div className="px-3 py-1.5 text-[11px] text-[#a3a3a3] truncate">已登录：{userEmail}</div>
-                <a href="/history" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-white/5">我的聊天</a>
-                <button onClick={handleSignOut} className="w-full text-left block px-3 py-2 rounded-lg text-sm hover:bg-red-500/10 text-red-400">退出登录</button>
-              </div>
-            </details>
-          ) : (
-            <>
-              <a
-                href="/login"
-                className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/10 text-[#e5e5e5] border border-white/10 shadow-sm"
-              >
-                登录 / 注册
-              </a>
-              <a
-                href="/login"
-                className="sm:hidden inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium bg-white/5 hover:bg-white/10 text-[#e5e5e5] border border-white/10 shadow-sm"
-              >
-                登录
-              </a>
-            </>
-          )}
-          {/* History */}
-          <a
-            href="/history"
-            className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/10 text-[#e5e5e5] border border-white/10 shadow-sm"
-            title="我的聊天"
+          <div className="flex items-center justify-between px-3 py-2 text-[13px] text-[var(--text-secondary)]">
+            <div className="flex items-center gap-3">
+              <Mic className="w-4 h-4" />
+              <span>输入模式</span>
+            </div>
+            <button
+              onClick={() => setInteractionMode(mode => mode === 'text' ? 'voice' : 'text')}
+              className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-hover)] border border-[var(--border-light)]"
+            >
+              {interactionMode === 'voice' ? '语音' : '文字'}
+            </button>
+          </div>
+
+          <button
+            onClick={() => setIsAppearanceDrawerOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
           >
-            我的聊天
-          </a>
-          {/* Consolidated menu (all sizes) */}
-          <details className="relative z-50">
-            <summary className="list-none inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 shadow cursor-pointer hover:bg-white/10">
-              <Menu className="w-5 h-5 text-[#e5e5e5]" />
-            </summary>
-            <div className="absolute right-0 mt-2 w-80 max-h-[75vh] overflow-y-auto overscroll-contain rounded-xl bg-[#1a1a1a]/95 shadow-2xl border border-white/10 p-2 space-y-1 backdrop-blur-md">
-              <a href="/mbti" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-emerald-500/10 hover:text-emerald-400">MBTI</a>
-              <a href="/lysk" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-purple-500/10 hover:text-purple-400">恋与深空</a>
-              <a href="/blog" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-blue-500/10 hover:text-blue-400">博客文章</a>
-              <a href="/history" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-white/5">我的聊天</a>
-              <a href="/login" className="block px-3 py-2 rounded-lg text-sm text-[#e5e5e5] hover:bg-white/5">登录</a>
-              <div className="h-px bg-white/10 my-1" />
-              <div className="px-2 py-1 text-[11px] text-[#737373]">快捷操作</div>
+            <Palette className="w-4 h-4" />
+            <span>视觉风格</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* --- Main Content Area --- */}
+      <main
+        className="flex-1 flex flex-col min-w-0 relative z-0 transition-all duration-700"
+        style={{
+          backgroundImage: (selectedBg.url && !selectedBg.url.startsWith('dynamic')) ? `url(${selectedBg.url})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {/* Dynamic Backgrounds */}
+        {selectedBg.id === 'rain' && <RainyBackground />}
+        {selectedBg.id === 'meadow' && <MeadowBackground />}
+
+        {/* Background Overlay for readability */}
+        {(selectedBg.url || selectedBg.id === 'rain' || selectedBg.id === 'meadow') && (
+          <div className={`absolute inset-0 ${['rain', 'meadow'].includes(selectedBg.id) ? 'backdrop-blur-none' : 'backdrop-blur-[8px]'} -z-10 pointer-events-none transition-all duration-1000 ${selectedBg.id === 'rain' ? 'bg-transparent' : 'bg-white/10'}`} />
+        )}
+
+        {/* Dynamic Theme Background fallback */}
+        {!selectedBg.url && selectedBg.id === 'none' && (
+          <div className={`${themes[selectedTheme].bg} absolute inset-0 -z-30 opacity-100`} />
+        )}
+
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-panel)]">
+          <Logo className={`w-7 h-7 opacity-90 ${isDarkMode ? 'invert' : ''}`} />
+          <div className="text-xs font-bold text-[var(--text-primary)] px-3 py-1 rounded-full bg-[var(--bg-hover)] border border-[var(--border-light)] uppercase tracking-widest">
+            {pathname === '/lysk' ? '恋与深空' : 'MBTI创作'}
+          </div>
+          <button onClick={() => setIsPersonaDrawerOpen(true)} className="p-2 rounded-full hover:bg-[var(--bg-hover)]">
+            <Settings className="w-5 h-5 text-[var(--text-secondary)]" />
+          </button>
+        </header>
+
+        {/* Global Persona Bar (if active) */}
+        {(viewMode === 'game' || viewMode === 'mbti') && (
+          <div className="px-4 py-2 border-b border-[var(--border-light)] bg-[var(--bg-panel)]/40 backdrop-blur-sm">
+            <div className="max-w-4xl mx-auto flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-[var(--text-tertiary)]">当前身份：</span>
+                <span className={`font-bold ${userPersona.name ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)] opacity-70'}`}>
+                  {userPersona.name || '未配置人设'}
+                </span>
+                {userPersona.name && <span className="px-1.5 py-0.5 rounded bg-[var(--accent-main)]/10 text-[10px] text-[var(--accent-main)] uppercase border border-[var(--accent-main)]/20">{userPersona.mbti || 'MBTI'}</span>}
+              </div>
               <button
-                onClick={() => hasMessages && handleCopy()}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hasMessages ? 'hover:bg-white/5 text-[#e5e5e5]' : 'text-[#737373] cursor-not-allowed'}`}
-                disabled={!hasMessages}
+                onClick={() => setIsPersonaDrawerOpen(true)}
+                className="text-[var(--accent-main)] hover:opacity-80 transition-colors font-bold"
               >
-                复制最近回复
+                修改
               </button>
-              <button
-                onClick={async () => {
-                  if (!hasMessages) return;
-                  try {
-                    setBlogLoading(true);
-                    const res = await fetch('/api/blog', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ messages }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
-                    setBlogDraft({ title: data.title, markdown: data.markdown });
-                    localStorage.setItem('chat2blog_draft', JSON.stringify({ title: data.title, content: data.markdown }));
-                  } catch (e) {
-                    console.error('Blog generation failed', e);
-                    alert('生成博客失败，请重试');
-                  } finally {
-                    setBlogLoading(false);
+            </div>
+          </div>
+        )}
+
+        {/* --- Chat Content --- */}
+        <div className="flex-1 overflow-y-auto px-4 py-8 space-y-6 scroll-smooth custom-scrollbar">
+          <div className="max-w-4xl mx-auto space-y-8">
+            {messages.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center py-20 text-center"
+              >
+                <h2 className="text-2xl font-black text-[var(--text-primary)] mb-2 tracking-tight mt-10">开启一段对话</h2>
+                <p className="text-[var(--text-secondary)] text-sm max-w-sm">在这里记录灵感，通过对话生成触动人心的博客文章。</p>
+              </motion.div>
+            )}
+
+            {messages.map((m: any) => {
+              const content = getMessageContent(m);
+              const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
+              const hasRoles = parsed && parsed.roles.length > 0;
+
+              if (m.role !== 'assistant' || !hasRoles) {
+                return (
+                  <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
+                      {m.role === 'user' ? <div className="text-[10px] font-black uppercase">You</div> : <Sparkles className="w-4 h-4" />}
+                    </div>
+                    <div className={`p-4 max-w-[85%] ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
+                      <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
+                        <ReactMarkdown>{content}</ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <MbtiReply
+                  key={m.id}
+                  parsed={parsed!}
+                  messageId={m.id}
+                  theme={selectedTheme}
+                  viewMode={viewMode}
+                  selectedGameRoles={
+                    viewMode === 'game'
+                      ? (messageSelectedRoles[String(m.id ?? '')] || selectedRoles)
+                      : undefined
                   }
-                }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${hasMessages && !blogLoading ? 'hover:bg-emerald-500/10 text-emerald-400' : 'text-[#737373] cursor-not-allowed'
-                  }`}
-                disabled={!hasMessages || blogLoading}
-              >
-                <span>生成博客</span>
-                {blogLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={() => hasMessages && clearChat()}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hasMessages ? 'hover:bg-red-500/10 text-red-400' : 'text-[#737373] cursor-not-allowed'}`}
-                disabled={!hasMessages}
-              >
-                清空聊天
-              </button>
-              <div className="h-px bg-white/10 my-1" />
-              <div className="px-2 py-1 text-[11px] text-[#737373]">我的信息（可选）</div>
-              <div className="px-2 py-1 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-2">
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">人设名（必填，后续对话默认使用这个人设）</div>
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* --- Input Console --- */}
+        <section className={`p-4 border-t transition-all ${selectedBg.url ? 'bg-white/60 backdrop-blur-xl border-white/20' : 'bg-white border-slate-100'}`}>
+          <div className="max-w-4xl mx-auto">
+            {/* Draft Preview Tooltip */}
+            <AnimatePresence>
+              {blogDraft && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className={`mb-4 p-4 rounded-2xl border shadow-2xl flex items-center justify-between ${selectedBg.url ? 'bg-white/80' : 'bg-slate-50 border-slate-200'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-[#a3a3a3] uppercase font-bold tracking-widest">博客草稿已就绪</div>
+                      <div className="text-sm text-[#e5e5e5] font-bold line-clamp-1">{blogDraft.title}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setBlogDraft(null)} className="p-2 rounded-lg hover:bg-white/5 text-[#a3a3a3]">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('chat2blog_draft', JSON.stringify({ title: blogDraft.title, content: blogDraft.markdown }));
+                        router.push('/publish');
+                      }}
+                      className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-500 transition-all flex items-center gap-2"
+                    >
+                      <Globe className="w-4 h-4" /> 立即发布
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Main Input Form */}
+            <div className="flex flex-col gap-3">
+              {interactionMode === 'voice' && isRecording && (
+                <div className="h-16 bg-white/5 rounded-2xl flex items-center justify-center relative overflow-hidden">
+                  <AudioVisualizer stream={audioStream} isRecording={isRecording} />
+                  <button onClick={stopRecording} className="absolute right-4 p-2 bg-red-500/20 text-red-500 rounded-full">
+                    <StopCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <div className={`flex-1 rounded-2xl flex items-center px-4 transition-all focus-within:ring-2 ${themes[selectedTheme].inputBg}`} style={{ '--tw-ring-color': `${themes[selectedTheme].accent}33` } as any}>
+                  <textarea
+                    rows={1}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage(e as any);
+                      }
+                    }}
+                    placeholder={interactionMode === 'voice' ? (isRecording ? "正在倾听..." : "点击麦克风或直接输入...") : "聊聊你的想法..."}
+                    className="flex-1 bg-transparent border-none outline-none py-4 max-h-48 resize-none text-[15px] font-medium placeholder-slate-400"
+                  />
+                  {interactionMode === 'voice' && (
+                    <button
+                      type="button"
+                      onClick={toggleRecording}
+                      className={`p-2 rounded-xl transition-all ${isRecording ? "text-red-500 bg-red-50" : "text-slate-400 hover:bg-slate-100"}`}
+                    >
+                      <Mic className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={!inputValue && !isRecording}
+                  className={`p-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50 ${themes[selectedTheme].button}`}
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </form>
+
+              {/* Input Tools */}
+              <div className="flex items-center gap-4 px-2">
+                <button
+                  onClick={async () => {
+                    if (!hasMessages) return;
+                    try {
+                      setBlogLoading(true);
+                      const res = await fetch('/api/blog', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ messages }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
+                      setBlogDraft({ title: data.title, markdown: data.markdown });
+                    } catch (e) {
+                      alert('生成博客失败，请重试');
+                    } finally {
+                      setBlogLoading(false);
+                    }
+                  }}
+                  disabled={!hasMessages || blogLoading}
+                  className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--accent-main)] transition-colors disabled:opacity-30"
+                >
+                  {blogLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  <span>生成博客</span>
+                </button>
+                <button
+                  onClick={() => hasMessages && clearChat()}
+                  disabled={!hasMessages}
+                  className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary)] hover:text-red-500 transition-colors disabled:opacity-30"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>清除对话</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* --- Mobile Tab Bar --- */}
+        <nav className="lg:hidden flex items-center justify-around h-16 border-t border-[var(--border-light)] bg-[var(--bg-panel)] pb-safe">
+          <Link href="/mbti" className={`flex flex-col items-center gap-1 ${pathname === '/mbti' || pathname === '/lysk' ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)]'}`}>
+            <MessageCircle className="w-5 h-5" />
+            <span className="text-[10px] font-bold">群聊</span>
+          </Link>
+          <Link href="/blog" className={`flex flex-col items-center gap-1 ${pathname === '/blog' ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)]'}`}>
+            <LayoutGrid className="w-5 h-5" />
+            <span className="text-[10px] font-bold">广场</span>
+          </Link>
+          <Link href="/blog" className="flex flex-col items-center gap-1 text-[var(--text-tertiary)]">
+            <PenTool className="w-5 h-5" />
+            <span className="text-[10px] font-bold">我的</span>
+          </Link>
+          <button onClick={() => setIsPersonaDrawerOpen(true)} className="flex flex-col items-center gap-1 text-[var(--text-tertiary)]">
+            <Settings className="w-5 h-5" />
+            <span className="text-[10px] font-bold">设置</span>
+          </button>
+        </nav>
+      </main>
+
+      {/* --- Global Persona Drawer --- */}
+      <AnimatePresence>
+        {isPersonaDrawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPersonaDrawerOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+            />
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-[var(--bg-page)] shadow-2xl z-[101] border-l border-[var(--border-light)] flex flex-col"
+            >
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <UserCircle className="w-6 h-6 text-[var(--accent-main)]" />
+                  <h3 className="text-lg font-black text-[var(--text-primary)]">人设配置</h3>
+                </div>
+                <button onClick={() => setIsPersonaDrawerOpen(false)} className="p-2 hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] rounded-lg transition-colors">
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">人设名</label>
                     <input
                       value={userPersona.name}
                       onChange={(e) => {
@@ -1367,38 +1833,40 @@ export default function ChatApp() {
                         setUserPersona(next);
                         persistUserPersona(next);
                       }}
-                      placeholder="例如：小雨 / 阿梨 / 我本人"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                      placeholder="你的创作者昵称"
+                      className="w-full bg-[var(--bg-panel)] border border-[var(--border-light)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] placeholder:[var(--text-tertiary)] focus:ring-1 focus:ring-[var(--accent-main)]/50 outline-none"
                     />
                   </div>
-                  <div>
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">MBTI</div>
-                    <input
-                      value={userPersona.mbti}
-                      onChange={(e) => {
-                        const next = { ...userPersona, mbti: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
-                      placeholder="INFP"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">MBTI</label>
+                      <input
+                        value={userPersona.mbti}
+                        onChange={(e) => {
+                          const next = { ...userPersona, mbti: e.target.value };
+                          setUserPersona(next);
+                          persistUserPersona(next);
+                        }}
+                        placeholder="e.g. INFP"
+                        className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">作息</label>
+                      <input
+                        value={userPersona.schedule}
+                        onChange={(e) => {
+                          const next = { ...userPersona, schedule: e.target.value };
+                          setUserPersona(next);
+                          persistUserPersona(next);
+                        }}
+                        placeholder="e.g. 熬夜党"
+                        className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">作息</div>
-                    <input
-                      value={userPersona.schedule}
-                      onChange={(e) => {
-                        const next = { ...userPersona, schedule: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
-                      placeholder="晚睡/早起/熬夜党"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">喜欢吃/偏好</div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">偏好/喜欢</label>
                     <input
                       value={userPersona.likes}
                       onChange={(e) => {
@@ -1406,25 +1874,12 @@ export default function ChatApp() {
                         setUserPersona(next);
                         persistUserPersona(next);
                       }}
-                      placeholder="抹茶/辣锅/烤肉（不吃香菜）"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                      placeholder="e.g. 抹茶、摄影"
+                      className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">工作/学习</div>
-                    <input
-                      value={userPersona.work}
-                      onChange={(e) => {
-                        const next = { ...userPersona, work: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
-                      placeholder="互联网产品/学生/自由职业..."
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">雷点/禁忌</div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">雷点/禁忌</label>
                     <input
                       value={userPersona.redlines}
                       onChange={(e) => {
@@ -1432,12 +1887,12 @@ export default function ChatApp() {
                         setUserPersona(next);
                         persistUserPersona(next);
                       }}
-                      placeholder="例如：别叫我MC；别说教；别冷暴力"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                      placeholder="避免提到的内容"
+                      className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <div className="text-[11px] text-[#a3a3a3] mb-1">补充（可选）</div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">补充描述</label>
                     <textarea
                       value={userPersona.extras}
                       onChange={(e) => {
@@ -1445,307 +1900,135 @@ export default function ChatApp() {
                         setUserPersona(next);
                         persistUserPersona(next);
                       }}
-                      placeholder="想让他们记住的其他细节..."
-                      className="w-full min-h-[70px] resize-y rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs text-[#e5e5e5] placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                      rows={4}
+                      placeholder="想让 AI 记住的其他细节..."
+                      className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none resize-none"
                     />
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#737373]">会自动保存到本机并用于后续聊天</span>
-                  <button
-                    onClick={() => {
-                      setUserPersona(emptyPersona);
-                      persistUserPersona(emptyPersona);
-                    }}
-                    className="px-2 py-1 text-[11px] rounded-md bg-white/10 hover:bg-white/20 border border-white/10 text-[#a3a3a3]"
-                  >
-                    清空
-                  </button>
-                </div>
-              </div>
-              {!fixedMode && (
-                <>
-                  <div className="h-px bg-white/10 my-1" />
-                  <div className="px-2 py-1 text-[11px] text-[#737373]">视图</div>
-                  <button onClick={() => setViewMode('mbti')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode === 'mbti' ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-white/5 text-[#e5e5e5]'}`}>MBTI</button>
-                  <button onClick={() => setViewMode('game')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${viewMode === 'game' ? 'bg-purple-500/10 text-purple-400' : 'hover:bg-white/5 text-[#e5e5e5]'}`}>恋与深空</button>
-                  <div className="h-px bg-white/10 my-1" />
-                  <div className="px-2 py-1 text-[11px] text-[#737373]">交互模式</div>
-                  <button onClick={() => setInteractionMode('text')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode === 'text' ? 'bg-white/10 text-[#e5e5e5]' : 'hover:bg-white/5 text-[#a3a3a3]'}`}>文字</button>
-                  <button onClick={() => setInteractionMode('voice')} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${interactionMode === 'voice' ? 'bg-white/10 text-[#e5e5e5]' : 'hover:bg-white/5 text-[#a3a3a3]'}`}>语音</button>
-                </>
-              )}
-              {viewMode === 'game' && (
-                <>
-                  <div className="h-px bg-white/10 my-1" />
-                  <div className="px-2 py-1 text-[11px] text-[#737373]">聊天人选（最多5人）</div>
-                  <div className="px-2 py-1 space-y-1">
-                    {allGameRoles.map((r) => {
-                      const checked = selectedRoles.includes(r);
-                      return (
-                        <label key={r} className="flex items-center gap-2 text-sm text-[#e5e5e5]">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              setSelectedRoles((prev) => {
-                                if (e.target.checked) {
-                                  const next = [...new Set([...prev, r])];
-                                  return next.slice(0, 5);
-                                } else {
-                                  return prev.filter(x => x !== r);
-                                }
-                              });
-                            }}
-                            className="h-3.5 w-3.5 rounded border-white/20 bg-white/5"
-                          />
-                          <span>{r}</span>
-                        </label>
-                      );
-                    })}
+
+                {viewMode === 'game' && (
+                  <div className="space-y-4 pt-4 border-t border-white/5">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">成员管理 (恋与深空)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {allGameRoles.map(r => (
+                        <button
+                          key={r}
+                          onClick={() => {
+                            setSelectedRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r].slice(0, 5));
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${selectedRoles.includes(r) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-white/5 text-[#a3a3a3] border-white/5'}`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </>
-              )}
-              <div className="h-px bg-white/10 my-1" />
-              <div className="px-2 py-1 text-[11px] text-[#737373]">主题</div>
-              <div className="flex items-center gap-1 bg-white/10 rounded-full p-1 border border-white/10">
-                <button onClick={() => setTheme('green')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'green' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>🌿</button>
-                <button onClick={() => setTheme('lavender')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'lavender' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>💜</button>
-                <button onClick={() => setTheme('pink')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'pink' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>🌸</button>
-                <button onClick={() => setTheme('butter')} className={`w-7 h-7 flex items-center justify-center text-xs rounded-full ${theme === 'butter' ? 'bg-white/20 shadow font-medium text-white' : 'hover:bg-white/10'}`}>🧈</button>
+                )}
               </div>
-            </div>
-          </details>
-        </div>
-      </header>
-      {(viewMode === 'game' || viewMode === 'mbti') && (
-        <div className="px-4 py-2 bg-[#1a1a1a]/80 backdrop-blur border-b border-white/5">
-          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-            <div className="text-sm text-[#a3a3a3]">
-              <span className="font-medium text-[#e5e5e5]">当前人设：</span>
-              {userPersona?.name?.trim() ? (
-                <span className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {userPersona.name.trim()}
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  未设置（去右上角菜单填写“人设名”）
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {viewMode === 'game' && (
-        <div className="px-4 py-2 bg-[#1a1a1a]/80 backdrop-blur border-b border-white/5">
-          <div className="flex items-center justify-between max-w-5xl mx-auto">
-            <div className="flex gap-2 flex-wrap">
-              {allGameRoles.map((r) => {
-                const active = selectedRoles.includes(r);
-                return (
-                  <button
-                    key={r}
-                    onClick={() => {
-                      setSelectedRoles((prev) => {
-                        return active
-                          ? prev.filter((x) => x !== r)
-                          : [...new Set([...prev, r])].slice(0, 5);
-                      });
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm border ${active
-                      ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
-                      : 'bg-white/5 text-[#a3a3a3] border-white/10 hover:bg-white/10'
-                      }`}
-                  >
-                    {r}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedRoles([...allGameRoles])} className="px-2 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[#a3a3a3]">全选</button>
-              <button onClick={() => setSelectedRoles([])} className="px-2 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[#a3a3a3]">清空</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
-        {messages.length === 0 && (
-          <div className="flex gap-3">
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo} flex-shrink-0 flex items-center justify-center mt-1`}>
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <div className={`p-4 rounded-3xl rounded-tl-none max-w-[85%] backdrop-blur-md ${themes[theme].cardBg}`}>
-              <p className="text-sm">
-                Hello! I'm your creative partner. Tell me what's on your mind, and let's turn it into a blog post.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {messages.map((m: any) => {
-          const content = getMessageContent(m);
-          const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
-          const hasRoles = parsed && parsed.roles.length > 0;
-
-          // 普通消息（用户，或无法解析为 MBTI 群聊的助手消息）
-          if (m.role !== 'assistant' || !hasRoles) {
-            return (
-              <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow ${m.role === 'user' ? 'bg-white/20 text-white' : `bg-gradient-to-tr ${themes[theme].accentFrom} ${themes[theme].accentTo}`}`}>
-                  {m.role === 'user' ? <div className="text-xs font-semibold">You</div> : <Sparkles className="w-4 h-4 text-white" />}
+              <div className="p-6 border-t border-[var(--border-light)] space-y-4 bg-[var(--bg-page)]">
+                <div className="flex items-center justify-between text-[11px] text-[var(--text-tertiary)]">
+                  <span>设置将自动加密保存至本地</span>
+                  <button onClick={() => { setUserPersona(emptyPersona); persistUserPersona(emptyPersona); }} className="hover:text-red-400">重置人设</button>
                 </div>
-                <div className={`p-3.5 rounded-3xl max-w-[85%] backdrop-blur-md shadow-none ${m.role === 'user' ? `${themes[theme].bubbleUser} rounded-tr-none` : `${themes[theme].bubbleBot} rounded-tl-none`}`}>
-                  <div className={`text-sm prose max-w-none ${m.role === 'user' ? 'prose-invert' : ''}`}>
-                    <ReactMarkdown>{content}</ReactMarkdown>
-                  </div>
-                </div>
+                <button
+                  onClick={() => setIsPersonaDrawerOpen(false)}
+                  className="w-full py-4 bg-[var(--accent-main)] text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:opacity-90 transition-all"
+                >
+                  确定
+                </button>
               </div>
-            );
-          }
-
-          return (
-            <MbtiReply
-              key={m.id}
-              parsed={parsed!}
-              messageId={m.id}
-              theme={theme}
-              viewMode={viewMode}
-              selectedGameRoles={
-                viewMode === 'game'
-                  ? (messageSelectedRoles[String(m.id ?? '')] || selectedRoles)
-                  : undefined
-              }
-            />
-          );
-        })}
-      </div>
-
-      {/* Blog Preview Panel */}
-      {blogDraft && (
-        <div className="border border-white/10 bg-[#1a1a1a] shadow-2xl p-4 rounded-xl">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-[#e5e5e5]">
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium">博客草稿预览</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setBlogDraft(null)}
-                className="px-2 py-1 text-xs rounded-md bg-white/5 text-[#a3a3a3] hover:bg-white/10 border border-white/10"
-              >关闭</button>
-              <button
-                onClick={() => {
-                  localStorage.setItem('chat2blog_draft', JSON.stringify({
-                    title: blogDraft.title,
-                    content: blogDraft.markdown
-                  }));
-                  router.push('/publish');
-                }}
-                className="px-2 py-1 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 font-bold shadow-lg shadow-emerald-500/20"
-              >
-                <Globe className="w-3 h-3" /> 去发布
-              </button>
-              <button
-                onClick={() => {
-                  const blob = new Blob([blogDraft.markdown], { type: 'text/markdown;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  const safeTitle = (blogDraft.title || 'draft').replace(/[^\w\-]+/g, '-');
-                  a.href = url;
-                  a.download = `${safeTitle}.md`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="px-2 py-1 text-xs rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1"
-              >
-                <Download className="w-3 h-3" /> 下载 .md
-              </button>
-              <button
-                onClick={() => {
-                  const blob = new Blob([blogDraft.markdown], { type: 'text/plain;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  const safeTitle = (blogDraft.title || 'draft').replace(/[^\w\-]+/g, '-');
-                  a.href = url;
-                  a.download = `${safeTitle}.txt`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1"
-              >
-                <Download className="w-3 h-3" /> 下载 .txt
-              </button>
-            </div>
-          </div>
-          <div className="prose max-w-none text-[15px] prose-neutral text-gray-900 max-h-[60vh] overflow-auto pr-1">
-            <ReactMarkdown>{blogDraft.markdown}</ReactMarkdown>
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="p-4 bg-white/60 backdrop-blur-2xl border-t border-white/40 shadow-inner">
-        {/* STT 提示和波形只在语音模式下显示 */}
-        {interactionMode === 'voice' && sttError && (
-          <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md p-2 flex items-center justify-between">
-            <span>{sttError}</span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSttError(null)} className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/15">忽略</button>
-              <button onClick={setupRecognition} className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500">重试</button>
-            </div>
-          </div>
+            </motion.aside>
+          </>
         )}
-        {/* Voice Visualizer */}
-        <AnimatePresence>
-          {interactionMode === 'voice' && isRecording && (
+      </AnimatePresence>
+
+      {/* --- Appearance Drawer --- */}
+      <AnimatePresence>
+        {isAppearanceDrawerOpen && (
+          <>
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 80, opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="mb-4 bg-white/5 rounded-xl flex items-center justify-center overflow-hidden relative"
-            >
-              <AudioVisualizer stream={audioStream} isRecording={isRecording} />
-              <button
-                onClick={stopRecording}
-                className="absolute bottom-2 right-2 p-1 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/30"
-              >
-                <StopCircle className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-          <div className={`flex-1 rounded-3xl flex items-center p-1.5 pl-4 transition-all focus-within:shadow-lg shadow ${themes[theme].inputBg}`}>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={interactionMode === 'voice' ? "Type or speak..." : "请输入内容..."}
-              className={`flex-1 bg-transparent border-none outline-none py-3 min-h-[44px] ${themes[theme].text}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAppearanceDrawerOpen(false)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
             />
-            {interactionMode === 'voice' && (
-              <button
-                type="button"
-                onClick={toggleRecording}
-                className={`p-2 rounded-2xl transition-all ${isRecording ? "text-red-600 bg-red-100" : `${themes[theme].textSub} hover:bg-black/5`}`}
-              >
-                <Mic className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            className={`p-3 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${themes[theme].button}`}
-            disabled={!inputValue && !(interactionMode === 'voice' && isRecording)}
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </form>
-      </div>
-    </main>
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-white shadow-2xl z-[101] border-l border-slate-100 flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Palette className="w-6 h-6 text-indigo-500" />
+                  <h3 className="text-lg font-black text-slate-900">视觉风格</h3>
+                </div>
+                <button onClick={() => setIsAppearanceDrawerOpen(false)} className="p-2 hover:bg-slate-50 text-slate-400 rounded-lg transition-colors">
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Theme Selection */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">配色方案</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(themes).map(([key, value]) => (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedTheme(key as keyof typeof themes)}
+                        className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${selectedTheme === key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-slate-200'}`}
+                      >
+                        <div
+                          className="w-10 h-10 rounded-full shadow-inner"
+                          style={{ backgroundColor: value.accent }}
+                        />
+                        <span className="text-xs font-bold text-slate-700">{value.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Background Selection */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">聊天背景</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {chatBackgrounds.map((bg) => (
+                      <button
+                        key={bg.id}
+                        onClick={() => setSelectedBg(bg)}
+                        className={`group relative h-24 rounded-2xl border-2 overflow-hidden transition-all ${selectedBg.id === bg.id ? 'border-indigo-500' : 'border-slate-100 hover:border-slate-200'}`}
+                      >
+                        {bg.url ? (
+                          <img src={bg.url} alt={bg.name} className="absolute inset-0 w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 bg-slate-50" />
+                        )}
+                        <div className={`absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity ${selectedBg.id === bg.id ? 'opacity-100 bg-black/10' : ''}`}>
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest">{bg.name}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-50">
+                <button
+                  onClick={() => setIsAppearanceDrawerOpen(false)}
+                  className="w-full py-4 bg-indigo-500 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-100"
+                >
+                  确定
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

@@ -31,48 +31,39 @@ export default function BlogListPage() {
     };
 
     return (
-
-        <div className="min-h-screen bg-[#151515] text-[#a3a3a3] font-serif">
+        <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 h-20 bg-[#151515]/80 backdrop-blur-xl border-b border-white/5 z-50 px-6 md:px-12 flex items-center justify-between">
+            <header className="fixed top-0 left-0 right-0 h-20 bg-[var(--bg-page)]/80 backdrop-blur-xl border-b border-[var(--border-light)] z-50 px-6 md:px-12 flex items-center justify-between">
                 <div className="flex items-center gap-6">
                     <button
-                        onClick={() => router.push('/')}
-                        className="p-3 hover:bg-white/5 rounded-full transition-all group"
+                        onClick={() => router.back()}
+                        className="p-3 hover:bg-[var(--bg-hover)] rounded-full transition-all group"
                     >
-                        <ArrowLeft className="w-5 h-5 text-[#a3a3a3] group-hover:text-white" />
+                        <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
                     </button>
-                    <div className="h-6 w-px bg-white/10" />
-                    <Logo className="w-8 h-8 opacity-90 invert" showText={true} />
+                    <div className="h-6 w-px bg-[var(--border-light)]" />
+                    <Logo className="w-8 h-8 opacity-90" showText={true} />
                 </div>
-                <div className="text-xs font-bold tracking-[0.2em] uppercase text-white/20">My Collection</div>
+                <div className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--text-tertiary)]">My Collection</div>
             </header>
 
             <main className="pt-32 px-6 max-w-4xl mx-auto pb-32">
-                <div className="flex items-end justify-between mb-16 border-b border-white/5 pb-8">
+                <div className="flex items-end justify-between mb-16 border-b border-[var(--border-light)] pb-8">
                     <div>
-                        <h1 className="text-5xl font-black tracking-tighter text-[#e5e5e5]">我的作品</h1>
-                        <p className="text-white/30 mt-2 font-medium">Recorded Inspirations — {posts.length} Posts</p>
+                        <h1 className="text-5xl font-black tracking-tighter text-[var(--text-primary)]">我的作品</h1>
+                        <p className="text-[var(--text-tertiary)] mt-2 font-medium">Recorded Inspirations — {posts.length} Posts</p>
                     </div>
-                    <button
-                        onClick={() => router.push('/lysk')}
-                        className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-full hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-900/20 active:scale-95 border border-emerald-500/20"
-                    >
-                        <Feather className="w-4 h-4" />
-                        开始创作
-                    </button>
                 </div>
 
                 {posts.length === 0 ? (
                     <div className="py-32 text-center">
-                        <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8">
-                            <Feather className="w-10 h-10 text-white/10" />
+                        <div className="w-24 h-24 bg-[var(--bg-hover)] rounded-full flex items-center justify-center mx-auto mb-8">
+                            <Feather className="w-10 h-10 text-[var(--text-tertiary)]" />
                         </div>
-                        <h3 className="text-2xl font-bold text-[#e5e5e5] mb-2">灵感尚未着墨</h3>
-                        <p className="text-white/30 mb-10 max-w-xs mx-auto">开启一段对话，将那些闪光的想法化作文字。</p>
+                        <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">灵感尚未着墨</h3>
+                        <p className="text-[var(--text-tertiary)] mb-10 max-w-xs mx-auto">开启一段对话，将那些闪光的想法化作文字。</p>
                         <div className="flex justify-center gap-4">
-                            <button onClick={() => router.push('/mbti')} className="px-8 py-3 bg-white/5 border border-white/10 text-[#e5e5e5] font-bold rounded-2xl hover:bg-white/10 transition-all">MBTI 创作</button>
-                            <button onClick={() => router.push('/lysk')} className="px-8 py-3 bg-white/5 border border-white/10 text-[#e5e5e5] font-bold rounded-2xl hover:bg-white/10 transition-all">恋与深空</button>
+                            <button onClick={() => router.push('/mbti')} className="px-8 py-3 bg-[var(--bg-hover)] border border-[var(--border-light)] text-[var(--text-primary)] font-bold rounded-2xl hover:opacity-80 transition-all">开启创作</button>
                         </div>
                     </div>
                 ) : (
@@ -90,22 +81,22 @@ export default function BlogListPage() {
                                 }}
                             >
                                 <div className="flex flex-col md:flex-row gap-8 cursor-pointer">
-                                    <div className="md:w-1/4 text-white/10 font-black text-6xl tracking-tighter tabular-nums transition-colors group-hover:text-emerald-500/40">
+                                    <div className="md:w-1/4 text-[var(--text-tertiary)] opacity-20 font-black text-6xl tracking-tighter tabular-nums transition-colors group-hover:text-[var(--accent-main)] group-hover:opacity-40">
                                         {(idx + 1).toString().padStart(2, '0')}
                                     </div>
                                     <div className="md:w-3/4">
                                         <div className="flex items-center gap-3 mb-4">
-                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] px-2 py-1 bg-emerald-900/50 text-emerald-400 border border-emerald-500/20 rounded">Published</span>
-                                            <span className="text-xs text-white/30 font-bold">{new Date(post.date).toLocaleDateString('zh-CN')}</span>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] px-2 py-1 bg-[var(--accent-main)]/10 text-[var(--accent-main)] border border-[var(--accent-main)]/20 rounded">Published</span>
+                                            <span className="text-xs text-[var(--text-tertiary)] font-bold">{new Date(post.date).toLocaleDateString('zh-CN')}</span>
                                         </div>
-                                        <h2 className="text-3xl md:text-4xl font-black text-[#e5e5e5] mb-4 group-hover:text-emerald-400 transition-colors leading-tight tracking-tighter">
+                                        <h2 className="text-3xl md:text-4xl font-black text-[var(--text-primary)] mb-4 group-hover:text-[var(--accent-main)] transition-colors leading-tight tracking-tighter">
                                             {post.title}
                                         </h2>
-                                        <p className="text-[#a3a3a3] line-clamp-3 text-lg leading-relaxed mb-6 font-medium">
+                                        <p className="text-[var(--text-secondary)] line-clamp-3 text-lg leading-relaxed mb-6 font-medium">
                                             {post.content.replace(/[#*`]/g, '').slice(0, 200)}...
                                         </p>
                                         <div className="flex items-center gap-6">
-                                            <span className="flex items-center gap-2 text-xs font-bold text-white/20">
+                                            <span className="flex items-center gap-2 text-xs font-bold text-[var(--text-tertiary)]">
                                                 <MessageSquare className="w-4 h-4" /> AI Assisted
                                             </span>
                                             <button
@@ -120,7 +111,7 @@ export default function BlogListPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:translate-x-4 transition-all text-emerald-400">
+                                <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:translate-x-4 transition-all text-[var(--accent-main)]">
                                     <ChevronRight className="w-8 h-8" />
                                 </div>
                             </motion.div>
