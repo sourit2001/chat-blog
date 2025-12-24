@@ -6,7 +6,7 @@ import {
   Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
   Download, Volume2, Loader2, Globe, LayoutGrid, Users, History,
   Settings, ChevronDown, ChevronRight, MessageCircle, PenTool, Palette,
-  UserCircle, Plus
+  UserCircle, Plus, VolumeX
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
@@ -84,6 +84,7 @@ const chatBackgrounds = [
   { id: 'cozy', name: '静谧', url: '/backgrounds/cozy.png' },
   { id: 'rain', name: '听雨', url: '/backgrounds/rain-cozy.png' },
   { id: 'meadow', name: '听风', url: '/backgrounds/meadow-cozy.png' },
+  { id: 'fireplace', name: '围炉', url: '/backgrounds/fireplace-cozy.png' },
 ];
 
 const RainyBackground = () => {
@@ -354,6 +355,63 @@ const MeadowBackground = () => (
   </div>
 );
 
+const FireplaceBackground = () => (
+  <div className="absolute inset-0 overflow-hidden bg-[#1a0f0a] -z-20">
+    {/* Base Scene */}
+    <img
+      src="/backgrounds/fireplace-cozy.png"
+      alt="Cozy Fireplace"
+      className="absolute inset-0 w-full h-full object-cover opacity-90"
+      style={{ filter: 'brightness(0.9) contrast(1.1)' }}
+    />
+
+    {/* Dynamic Fire Flicker Overlay */}
+    <motion.div
+      animate={{
+        opacity: [0.3, 0.45, 0.3, 0.5, 0.35],
+        scale: [1, 1.02, 1, 1.03, 1]
+      }}
+      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute inset-0 bg-[radial-gradient(circle_at_50%_60%,rgba(255,100,0,0.2)_0%,transparent_60%)] mix-blend-overlay pointer-events-none"
+    />
+
+    {/* Rising Embers & Sparks */}
+    {[...Array(40)].map((_, i) => (
+      <motion.div
+        key={`ember-${i}`}
+        initial={{
+          x: 40 + Math.random() * 20 + "%",
+          y: 60 + Math.random() * 10 + "%",
+          opacity: 0,
+          scale: 0.1 + Math.random() * 0.7
+        }}
+        animate={{
+          y: ["60%", (10 + Math.random() * 20) + "%"],
+          x: [
+            (40 + Math.random() * 20) + "%",
+            (35 + Math.random() * 30) + "%",
+            (25 + Math.random() * 50) + "%"
+          ],
+          opacity: [0, 1, 0.8, 0],
+          rotate: [0, 180, 360]
+        }}
+        transition={{
+          duration: 3 + Math.random() * 4,
+          repeat: Infinity,
+          ease: "easeOut",
+          delay: Math.random() * 6
+        }}
+        className="absolute w-1.5 h-1.5 pointer-events-none"
+      >
+        <div className="w-1 h-1 bg-gradient-to-t from-orange-400 to-yellow-200 rounded-full blur-[0.5px] shadow-[0_0_10px_rgba(255,120,0,0.9)]" />
+      </motion.div>
+    ))}
+
+    {/* Overall Hearth Glow */}
+    <div className="absolute inset-0 bg-gradient-to-t from-orange-900/30 via-transparent to-black/20 pointer-events-none" />
+  </div>
+);
+
 const getRoleEmoji = (role: string, mode: ViewMode) => {
   if (mode === 'game') {
     // 游戏小队视角：将 MBTI 槽位映射为《恋与深空》五位男主
@@ -563,7 +621,8 @@ export default function ChatApp() {
   // --- UI Layout States ---
   const [isPersonaDrawerOpen, setIsPersonaDrawerOpen] = useState(false);
   const [isAppearanceDrawerOpen, setIsAppearanceDrawerOpen] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<keyof typeof themes>('emerald');
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [selectedTheme, setSelectedTheme] = useState<keyof typeof themes>('amber');
   const [selectedBg, setSelectedBg] = useState(chatBackgrounds[0]);
   const [isChatSubMenuOpen, setIsChatSubMenuOpen] = useState(true);
 
@@ -598,6 +657,59 @@ export default function ChatApp() {
   // Game mode: selectable chat members (default all 5)
   const allGameRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] as const;
   const [selectedRoles, setSelectedRoles] = useState<string[]>([...allGameRoles]);
+
+  // --- Ambient Sound Engine (Local & Robust) ---
+  const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAmbientPlaying, setIsAmbientPlaying] = useState(false);
+  const [ambientVolume, setAmbientVolume] = useState(0.4);
+
+  const ambientSources: Record<string, string> = {
+    'rain': '/audio/gentle-rain-07-437321.mp3',
+    'meadow': '/audio/birds-forest-nature-445379.mp3',
+    'fireplace': '/audio/firewood-burning-sound-179862.mp3',
+  };
+
+  useEffect(() => {
+    const source = ambientSources[selectedBg.id];
+    if (!ambientAudioRef.current) {
+      ambientAudioRef.current = new Audio();
+      ambientAudioRef.current.loop = true;
+    }
+    const audio = ambientAudioRef.current;
+
+    if (source && isAmbientPlaying) {
+      const fullPath = window.location.origin + source;
+      if (audio.src !== fullPath) {
+        audio.src = source;
+        audio.load();
+      }
+      audio.volume = ambientVolume;
+      audio.play().catch(() => {
+        console.log("Audio waiting for interaction...");
+      });
+    } else {
+      audio.pause();
+      // Reset src if needed or just keep paused
+    }
+
+    return () => {
+      if (ambientAudioRef.current) ambientAudioRef.current.pause();
+    };
+  }, [selectedBg.id, isAmbientPlaying, ambientVolume]);
+
+  // Handle browser auto-play policy
+  useEffect(() => {
+    const unlock = () => {
+      if (isAmbientPlaying && ambientAudioRef.current && ambientAudioRef.current.paused) {
+        const source = ambientSources[selectedBg.id];
+        if (source) {
+          ambientAudioRef.current.play().catch(() => { });
+        }
+      }
+    };
+    window.addEventListener('click', unlock);
+    return () => window.removeEventListener('click', unlock);
+  }, [isAmbientPlaying, selectedBg.id]);
   const [messageSelectedRoles, setMessageSelectedRoles] = useState<Record<string, string[]>>({});
   const selectedRolesQueueRef = useRef<string[][]>([]);
   const userProfileStorageKey = 'chat_user_profile_v2';
@@ -1437,108 +1549,112 @@ export default function ChatApp() {
   return (
     <div className={`relative flex h-[100dvh] w-full overflow-hidden bg-[var(--bg-page)] font-sans ${themes[selectedTheme].text}`}>
       {/* --- Desktop Sidebar --- */}
-      <aside className="hidden lg:flex flex-col w-64 border-r border-[var(--border-light)] bg-[var(--bg-page)] z-30 transition-all">
-        {/* Top: Logo */}
-        <div className="p-8">
-          <Logo className={`w-8 h-8 opacity-90`} showText={true} />
-        </div>
-
-        {/* Mid: Creation Section */}
-        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="py-2">
-            <button
-              onClick={() => setIsChatSubMenuOpen(!isChatSubMenuOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--text-primary)]"
-            >
-              <div className="flex items-center gap-3">
-                <MessageCircle className="w-4 h-4 text-[var(--accent-main)]" />
-                <span>创作路径</span>
-              </div>
-              {isChatSubMenuOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronRight className="w-4 h-4 opacity-40" />}
-            </button>
-            <AnimatePresence>
-              {isChatSubMenuOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden mt-1 ml-4 space-y-1"
-                >
-                  <Link
-                    href="/mbti"
-                    className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/mbti' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
-                  >
-                    · MBTI 创作型
-                  </Link>
-                  <Link
-                    href="/lysk"
-                    className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/lysk' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
-                  >
-                    · 恋与深空同人
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
+      <aside
+        className={`hidden lg:flex flex-col border-r border-[var(--border-light)] bg-[var(--bg-page)] z-30 transition-all duration-500 ease-in-out overflow-hidden ${isSidebarVisible ? 'w-64' : 'w-0 border-r-0'}`}
+      >
+        <div className="min-w-[256px] flex flex-col h-full">
+          {/* Top: Logo */}
+          <div className="p-8">
+            <Logo className={`w-8 h-8 opacity-90`} showText={true} />
           </div>
 
-          <Link
-            href="/blog"
-            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/blog' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-          >
-            <div className={`w-0.5 h-4 bg-[var(--accent-main)] absolute left-0 ${pathname === '/blog' ? 'opacity-100' : 'opacity-0'}`} />
-            <LayoutGrid className="w-4 h-4" />
-            <span>博客广场</span>
-          </Link>
-
-          <Link
-            href="/blog"
-            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/my-blogs' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-          >
-            <PenTool className="w-4 h-4" />
-            <span>我的博客</span>
-          </Link>
-
-          <div className="h-px bg-[var(--border-light)] my-4 mx-3" />
-
-          <Link
-            href="/history"
-            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/history' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-          >
-            <History className="w-4 h-4" />
-            <span>聊天历史</span>
-          </Link>
-        </nav>
-
-        {/* Bottom: Settings & Modes */}
-        <div className="px-4 py-6 space-y-2 border-t border-[var(--border-light)] bg-[var(--bg-page)]">
-          <button
-            onClick={() => setIsPersonaDrawerOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
-          >
-            <UserCircle className="w-4 h-4" />
-            <span>人设配置</span>
-          </button>
-
-          <div className="flex items-center justify-between px-3 py-2 text-[13px] text-[var(--text-secondary)]">
-            <div className="flex items-center gap-3">
-              <Mic className="w-4 h-4" />
-              <span>输入模式</span>
+          {/* Mid: Creation Section */}
+          <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <div className="py-2">
+              <button
+                onClick={() => setIsChatSubMenuOpen(!isChatSubMenuOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--text-primary)]"
+              >
+                <div className="flex items-center gap-3">
+                  <MessageCircle className="w-4 h-4 text-[var(--accent-main)]" />
+                  <span>创作路径</span>
+                </div>
+                {isChatSubMenuOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronRight className="w-4 h-4 opacity-40" />}
+              </button>
+              <AnimatePresence>
+                {isChatSubMenuOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden mt-1 ml-4 space-y-1"
+                  >
+                    <Link
+                      href="/mbti"
+                      className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/mbti' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                    >
+                      · MBTI 创作型
+                    </Link>
+                    <Link
+                      href="/lysk"
+                      className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/lysk' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                    >
+                      · 恋与深空同人
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <button
-              onClick={() => setInteractionMode(mode => mode === 'text' ? 'voice' : 'text')}
-              className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-hover)] border border-[var(--border-light)]"
+
+            <Link
+              href="/blog"
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/blog' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              {interactionMode === 'voice' ? '语音' : '文字'}
+              <div className={`w-0.5 h-4 bg-[var(--accent-main)] absolute left-0 ${pathname === '/blog' ? 'opacity-100' : 'opacity-0'}`} />
+              <LayoutGrid className="w-4 h-4" />
+              <span>博客广场</span>
+            </Link>
+
+            <Link
+              href="/blog"
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/my-blogs' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+            >
+              <PenTool className="w-4 h-4" />
+              <span>我的博客</span>
+            </Link>
+
+            <div className="h-px bg-[var(--border-light)] my-4 mx-3" />
+
+            <Link
+              href="/history"
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/history' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+            >
+              <History className="w-4 h-4" />
+              <span>聊天历史</span>
+            </Link>
+          </nav>
+
+          {/* Bottom: Settings & Modes */}
+          <div className="px-4 py-6 space-y-2 border-t border-[var(--border-light)] bg-[var(--bg-page)]">
+            <button
+              onClick={() => setIsPersonaDrawerOpen(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
+            >
+              <UserCircle className="w-4 h-4" />
+              <span>人设配置</span>
+            </button>
+
+            <div className="flex items-center justify-between px-3 py-2 text-[13px] text-[var(--text-secondary)]">
+              <div className="flex items-center gap-3">
+                <Mic className="w-4 h-4" />
+                <span>输入模式</span>
+              </div>
+              <button
+                onClick={() => setInteractionMode(mode => mode === 'text' ? 'voice' : 'text')}
+                className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-hover)] border border-[var(--border-light)]"
+              >
+                {interactionMode === 'voice' ? '语音' : '文字'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setIsAppearanceDrawerOpen(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
+            >
+              <Palette className="w-4 h-4" />
+              <span>视觉风格</span>
             </button>
           </div>
-
-          <button
-            onClick={() => setIsAppearanceDrawerOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
-          >
-            <Palette className="w-4 h-4" />
-            <span>视觉风格</span>
-          </button>
         </div>
       </aside>
 
@@ -1551,9 +1667,19 @@ export default function ChatApp() {
           backgroundPosition: 'center',
         }}
       >
-        {/* Dynamic Backgrounds */}
         {selectedBg.id === 'rain' && <RainyBackground />}
         {selectedBg.id === 'meadow' && <MeadowBackground />}
+        {selectedBg.id === 'fireplace' && <FireplaceBackground />}
+
+        {/* Sidebar Toggle Button (Desktop) */}
+        <div className="hidden lg:block absolute top-6 left-6 z-50">
+          <button
+            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+            className="p-3 rounded-2xl bg-white/20 hover:bg-white/40 backdrop-blur-xl border border-white/30 shadow-xl transition-all group"
+          >
+            <Menu className={`w-5 h-5 text-[var(--text-primary)] transition-transform duration-500 ${isSidebarVisible ? 'rotate-90' : 'rotate-0'}`} />
+          </button>
+        </div>
 
         {/* Background Overlay for readability */}
         {(selectedBg.url || selectedBg.id === 'rain' || selectedBg.id === 'meadow') && (
@@ -2014,6 +2140,39 @@ export default function ChatApp() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Ambient Sound Section */}
+                <div className="space-y-4 pt-4 border-t border-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">背景白噪音</h4>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest">沉浸式聆听雨声或微风</p>
+                    </div>
+                    <button
+                      onClick={() => setIsAmbientPlaying(!isAmbientPlaying)}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${isAmbientPlaying ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                    >
+                      <motion.div
+                        animate={{ x: isAmbientPlaying ? 26 : 2 }}
+                        className="absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow-sm"
+                      />
+                    </button>
+                  </div>
+                  {isAmbientPlaying && (
+                    <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl">
+                      <Volume2 className="w-4 h-4 text-slate-400" />
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={ambientVolume}
+                        onChange={(e) => setAmbientVolume(parseFloat(e.target.value))}
+                        className="flex-1 accent-indigo-500 h-1 bg-slate-200 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
