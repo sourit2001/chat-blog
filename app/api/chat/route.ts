@@ -144,8 +144,8 @@ export async function POST(req: Request) {
 
     // Getting current date for grounding context
     const now = new Date();
-    const currentDateString = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-    const currentTimeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const currentDateString = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Shanghai' });
+    const currentTimeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Shanghai' });
     const timeContext = `\n【当前时间（真实世界）】\n今天是 ${currentDateString}，时间 ${currentTimeString}。请基于这个“当前准确时间”来回答关于日期、节日或时效性新闻的问题。如果用户询问“今天”，指的就是这一天。`;
 
     const filterDisallowedSpeakers = (text: string, allowed: string[]) => {

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Share2, Feather, Clock, Heart, MessageSquare, Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Logo } from "@/components/Logo";
+import { UserStatus } from '@/components/UserStatus';
 
 type BlogPost = {
     id: string;
@@ -119,7 +120,7 @@ export default function BlogDetailPage() {
                     <div className="h-6 w-px bg-[var(--border-light)]" />
                     <Logo className="w-8 h-8 opacity-90" showText={true} />
                 </div>
-                <div className="flex gap-4">
+                <div className="flex items-center gap-4">
                     <button
                         onClick={handleShare}
                         className="p-3 hover:bg-[var(--bg-hover)] rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all flex items-center gap-2"
@@ -128,6 +129,8 @@ export default function BlogDetailPage() {
                         {isCopied ? <span className="text-xs font-sans font-medium text-[var(--accent-main)]">已复制</span> : null}
                         <Share2 className="w-5 h-5" />
                     </button>
+                    <div className="h-6 w-px bg-[var(--border-light)] hidden md:block" />
+                    <UserStatus />
                 </div>
             </header>
 
@@ -154,7 +157,7 @@ export default function BlogDetailPage() {
                             <div className="flex items-center justify-center gap-4 text-sm font-medium text-[var(--text-tertiary)] tracking-widest uppercase">
                                 <span className="flex items-center gap-1.5">
                                     <Clock className="w-4 h-4 text-[var(--accent-main)]/80" />
-                                    {new Date(post.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                    {new Date(post.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' })}
                                 </span>
                                 <span className="text-[var(--border-light)]">•</span>
                                 <span>AI 灵感协作</span>

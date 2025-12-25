@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, ChevronRight, MessageSquare, Trash2, Feather } from 'lucide-react';
 import { Logo } from "@/components/Logo";
+import { UserStatus } from '@/components/UserStatus';
 
 type BlogPost = {
     id: string;
@@ -44,7 +45,11 @@ export default function BlogListPage() {
                     <div className="h-6 w-px bg-[var(--border-light)]" />
                     <Logo className="w-8 h-8 opacity-90" showText={true} />
                 </div>
-                <div className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--text-tertiary)]">My Collection</div>
+                <div className="flex items-center gap-6">
+                    <div className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--text-tertiary)] hidden md:block">My Collection</div>
+                    <div className="h-6 w-px bg-[var(--border-light)] hidden md:block" />
+                    <UserStatus />
+                </div>
             </header>
 
             <main className="pt-32 px-6 max-w-4xl mx-auto pb-32">
@@ -87,7 +92,7 @@ export default function BlogListPage() {
                                     <div className="md:w-3/4">
                                         <div className="flex items-center gap-3 mb-4">
                                             <span className="text-[10px] font-black uppercase tracking-[0.2em] px-2 py-1 bg-[var(--accent-main)]/10 text-[var(--accent-main)] border border-[var(--accent-main)]/20 rounded">Published</span>
-                                            <span className="text-xs text-[var(--text-tertiary)] font-bold">{new Date(post.date).toLocaleDateString('zh-CN')}</span>
+                                            <span className="text-xs text-[var(--text-tertiary)] font-bold">{new Date(post.date).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>
                                         </div>
                                         <h2 className="text-3xl md:text-4xl font-black text-[var(--text-primary)] mb-4 group-hover:text-[var(--accent-main)] transition-colors leading-tight tracking-tighter">
                                             {post.title}

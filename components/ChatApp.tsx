@@ -15,6 +15,7 @@ import ReactMarkdown from "react-markdown";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { Logo } from "@/components/Logo";
 import Link from 'next/link';
+import { UserStatus } from '@/components/UserStatus';
 
 type ParsedMbtiReply = {
   intro: string;
@@ -622,6 +623,7 @@ export default function ChatApp() {
   const [isPersonaDrawerOpen, setIsPersonaDrawerOpen] = useState(false);
   const [isAppearanceDrawerOpen, setIsAppearanceDrawerOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<keyof typeof themes>('amber');
   const [selectedBg, setSelectedBg] = useState(chatBackgrounds[0]);
   const [isChatSubMenuOpen, setIsChatSubMenuOpen] = useState(true);
@@ -1548,11 +1550,27 @@ export default function ChatApp() {
 
   return (
     <div className={`relative flex h-[100dvh] w-full overflow-hidden bg-[var(--bg-page)] font-sans ${themes[selectedTheme].text}`}>
-      {/* --- Desktop Sidebar --- */}
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isMobileSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* --- Sidebar Area (Desktop & Mobile) --- */}
       <aside
-        className={`hidden lg:flex flex-col border-r border-[var(--border-light)] bg-[var(--bg-page)] z-30 transition-all duration-500 ease-in-out overflow-hidden ${isSidebarVisible ? 'w-64' : 'w-0 border-r-0'}`}
+        className={`fixed inset-y-0 left-0 lg:relative flex flex-col border-r border-[var(--border-light)] bg-[var(--bg-page)] z-[70] lg:z-30 transition-all duration-500 ease-in-out overflow-hidden 
+          ${isMobileSidebarOpen ? 'w-[280px] translate-x-0 shadow-2xl' : 'w-0 -translate-x-full lg:translate-x-0'}
+          ${isSidebarVisible ? 'lg:w-64' : 'lg:w-0 lg:border-r-0'}
+        `}
       >
-        <div className="min-w-[256px] flex flex-col h-full">
+        <div className="w-[280px] lg:w-[256px] flex flex-col h-full">
           {/* Top: Logo */}
           <div className="p-8">
             <Logo className={`w-8 h-8 opacity-90`} showText={true} />
@@ -1581,12 +1599,14 @@ export default function ChatApp() {
                   >
                     <Link
                       href="/mbti"
+                      onClick={() => setIsMobileSidebarOpen(false)}
                       className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/mbti' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
                     >
                       · MBTI 创作型
                     </Link>
                     <Link
                       href="/lysk"
+                      onClick={() => setIsMobileSidebarOpen(false)}
                       className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/lysk' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
                     >
                       · 恋与深空同人
@@ -1598,6 +1618,7 @@ export default function ChatApp() {
 
             <Link
               href="/blog"
+              onClick={() => setIsMobileSidebarOpen(false)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/blog' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
               <div className={`w-0.5 h-4 bg-[var(--accent-main)] absolute left-0 ${pathname === '/blog' ? 'opacity-100' : 'opacity-0'}`} />
@@ -1607,6 +1628,7 @@ export default function ChatApp() {
 
             <Link
               href="/blog"
+              onClick={() => setIsMobileSidebarOpen(false)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/my-blogs' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
               <PenTool className="w-4 h-4" />
@@ -1617,6 +1639,7 @@ export default function ChatApp() {
 
             <Link
               href="/history"
+              onClick={() => setIsMobileSidebarOpen(false)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/history' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
               <History className="w-4 h-4" />
@@ -1637,7 +1660,7 @@ export default function ChatApp() {
             <div className="flex items-center justify-between px-3 py-2 text-[13px] text-[var(--text-secondary)]">
               <div className="flex items-center gap-3">
                 <Mic className="w-4 h-4" />
-                <span>输入模式</span>
+                <span>聊天模式</span>
               </div>
               <button
                 onClick={() => setInteractionMode(mode => mode === 'text' ? 'voice' : 'text')}
@@ -1654,6 +1677,9 @@ export default function ChatApp() {
               <Palette className="w-4 h-4" />
               <span>视觉风格</span>
             </button>
+            <div className="pt-4 mt-2 border-t border-[var(--border-light)]">
+              <UserStatus isSidebar={true} />
+            </div>
           </div>
         </div>
       </aside>
@@ -1692,14 +1718,25 @@ export default function ChatApp() {
         )}
 
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-panel)]">
-          <Logo className={`w-7 h-7 opacity-90 ${isDarkMode ? 'invert' : ''}`} />
-          <div className="text-xs font-bold text-[var(--text-primary)] px-3 py-1 rounded-full bg-[var(--bg-hover)] border border-[var(--border-light)] uppercase tracking-widest">
-            {pathname === '/lysk' ? '恋与深空' : 'MBTI创作'}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-panel)] z-50">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-2 -ml-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Menu className="w-5 h-5 text-[var(--text-secondary)]" />
+            </button>
+            <Logo className={`w-7 h-7 opacity-90 ${isDarkMode ? 'invert' : ''}`} />
           </div>
-          <button onClick={() => setIsPersonaDrawerOpen(true)} className="p-2 rounded-full hover:bg-[var(--bg-hover)]">
-            <Settings className="w-5 h-5 text-[var(--text-secondary)]" />
-          </button>
+          <div className="flex items-center gap-3">
+            <UserStatus />
+            <button
+              onClick={() => setIsPersonaDrawerOpen(true)}
+              className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Settings className="w-5 h-5 text-[var(--text-secondary)]" />
+            </button>
+          </div>
         </header>
 
         {/* Global Persona Bar (if active) */}
@@ -1816,7 +1853,7 @@ export default function ChatApp() {
 
             {/* Main Input Form */}
             <div className="flex flex-col gap-3">
-              {interactionMode === 'voice' && isRecording && (
+              {isRecording && (
                 <div className="h-16 bg-white/5 rounded-2xl flex items-center justify-center relative overflow-hidden">
                   <AudioVisualizer stream={audioStream} isRecording={isRecording} />
                   <button onClick={stopRecording} className="absolute right-4 p-2 bg-red-500/20 text-red-500 rounded-full">
@@ -1837,10 +1874,13 @@ export default function ChatApp() {
                         handleSendMessage(e as any);
                       }
                     }}
-                    placeholder={interactionMode === 'voice' ? (isRecording ? "正在倾听..." : "点击麦克风或直接输入...") : "聊聊你的想法..."}
+                    placeholder={isRecording ? "正在倾听..." : (interactionMode === 'voice' ? "正在语音聊天模式..." : "正在文字聊天模式...")}
                     className="flex-1 bg-transparent border-none outline-none py-4 max-h-48 resize-none text-[15px] font-medium placeholder-slate-400"
                   />
-                  {interactionMode === 'voice' && (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all ${interactionMode === 'voice' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                      {interactionMode === 'voice' ? '语音回复' : '仅文字'}
+                    </span>
                     <button
                       type="button"
                       onClick={toggleRecording}
@@ -1848,7 +1888,7 @@ export default function ChatApp() {
                     >
                       <Mic className="w-5 h-5" />
                     </button>
-                  )}
+                  </div>
                 </div>
                 <button
                   type="submit"

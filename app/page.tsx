@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Sparkles, Users, MessageSquare, Heart, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Logo } from "@/components/Logo";
+import { UserStatus } from '@/components/UserStatus';
 
 export default function Home() {
   return (
@@ -11,13 +12,15 @@ export default function Home() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-8 md:px-16 z-50">
         <Logo className="w-10 h-10" showText={true} />
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-6">
           <Link href="/blog" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors">
             我的作品
           </Link>
           <Link href="/mbti" className="px-6 py-2 bg-[var(--accent-main)] text-white text-sm font-bold rounded-full hover:opacity-90 transition-all">
             开始创作
           </Link>
+          <div className="h-6 w-px bg-[var(--border-light)] mx-2" />
+          <UserStatus />
         </div>
       </nav>
 

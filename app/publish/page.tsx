@@ -149,7 +149,7 @@ export default function PublishPage() {
                                     <div className="flex items-center justify-center gap-4 text-sm font-medium text-[var(--text-tertiary)] tracking-widest uppercase">
                                         <span>文 / AI 创作者</span>
                                         <span className="text-[var(--border-light)]">•</span>
-                                        <span>{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        <span>{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' })}</span>
                                     </div>
                                 </motion.div>
                             </header>

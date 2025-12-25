@@ -5,6 +5,7 @@ import { supabaseClient } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { UserStatus } from '@/components/UserStatus';
 import { ArrowLeft, Clock, History } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
@@ -61,7 +62,11 @@ export default function HistoryPage() {
           <div className="h-6 w-px bg-[var(--border-light)]" />
           <Logo className="w-8 h-8 opacity-90" showText={true} />
         </div>
-        <div className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--text-tertiary)]">Dialogue History</div>
+        <div className="flex items-center gap-6">
+          <div className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--text-tertiary)] hidden md:block">Dialogue History</div>
+          <div className="h-6 w-px bg-[var(--border-light)] hidden md:block" />
+          <UserStatus />
+        </div>
       </header>
 
       <div className="pt-32 px-6 max-w-4xl mx-auto w-full pb-32">
@@ -89,7 +94,7 @@ export default function HistoryPage() {
                   <div className="font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-main)] transition-colors">{c.title || "未命名会话"}</div>
                   <div className="text-xs text-[var(--text-tertiary)] mt-1 flex items-center gap-2">
                     <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] uppercase font-bold text-[10px]">{c.view_mode === 'game' ? '恋与深空' : 'MBTI'}</span>
-                    <span>{new Date(c.created_at).toLocaleString()}</span>
+                    <span>{new Date(c.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>
                   </div>
                 </div>
               </div>
