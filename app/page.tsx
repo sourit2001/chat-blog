@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Users, MessageSquare, Heart, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Sparkles, Users, MessageSquare, Heart, ArrowRight, ChevronDown, BookOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from "@/components/Logo";
 import { UserStatus } from '@/components/UserStatus';
 
 export default function Home() {
+  const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(false);
+  const [isCommunityDropdownOpen, setIsCommunityDropdownOpen] = useState(false);
   useEffect(() => {
     // Force set the "Amber" (Orange) theme variables for the landing page
     const root = document.documentElement;
@@ -24,16 +26,97 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-300 to-orange-300 text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10 flex flex-col items-center justify-center p-6 overflow-hidden relative">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-8 md:px-16 z-50">
-        <Logo className="w-10 h-10" showText={true} accentColor="#F59E0B" />
+      <nav className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-8 md:px-16 z-50 bg-white/40 backdrop-blur-md border-b border-[var(--border-light)]">
+        <div className="flex items-center gap-10">
+          <Logo className="w-9 h-9" showText={true} accentColor="#F59E0B" />
+
+          <div className="hidden md:flex items-center gap-8">
+            <div
+              className="relative"
+              onMouseEnter={() => setIsChatDropdownOpen(true)}
+              onMouseLeave={() => setIsChatDropdownOpen(false)}
+            >
+              <button className="flex items-center gap-1 text-[14px] font-semibold text-slate-700 hover:text-slate-900 transition-colors py-8">
+                群聊 <ChevronDown className={`w-3.5 h-3.5 opacity-50 transition-transform ${isChatDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isChatDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 w-64 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-50"
+                  >
+                    <div className="space-y-2">
+                      <Link href="/mbti" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-slate-800">MBTI 创作实验室</p>
+                          <p className="text-[10px] text-slate-500">五位性格专家深度对谈</p>
+                        </div>
+                      </Link>
+                      <Link href="/lysk" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-slate-800">极夜编辑器</p>
+                          <p className="text-[10px] text-slate-500">捕捉动人的细腻瞬间</p>
+                        </div>
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div
+              className="relative"
+              onMouseEnter={() => setIsCommunityDropdownOpen(true)}
+              onMouseLeave={() => setIsCommunityDropdownOpen(false)}
+            >
+              <button className="flex items-center gap-1 text-[14px] font-semibold text-slate-700 hover:text-slate-900 transition-colors py-8">
+                社区 <ChevronDown className={`w-3.5 h-3.5 opacity-50 transition-transform ${isCommunityDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isCommunityDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 w-64 bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-50"
+                  >
+                    <div className="space-y-2">
+                      <Link href="/blog" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-slate-800">我的作品</p>
+                          <p className="text-[10px] text-slate-500">查看您创作的所有博文</p>
+                        </div>
+                      </Link>
+                      <Link href="/blog" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                          <Heart className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-slate-800">创作广场</p>
+                          <p className="text-[10px] text-slate-500">探索更多精彩对话内容</p>
+                        </div>
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center gap-6">
-          <Link href="/blog" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors">
-            我的作品
-          </Link>
-          <Link href="/mbti" className="px-6 py-2 bg-[var(--accent-main)] text-white text-sm font-bold rounded-full hover:opacity-90 transition-all">
-            开始创作
-          </Link>
-          <div className="h-6 w-px bg-[var(--border-light)] mx-2" />
           <UserStatus />
         </div>
       </nav>
@@ -60,69 +143,7 @@ export default function Home() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
-          {/* MBTI Mode */}
-          <Link href="/mbti">
-            <motion.div
-              whileHover={{ y: -8 }}
-              className="group relative bg-[var(--bg-panel)] rounded-[3rem] p-12 border border-[var(--border-light)] hover:border-[var(--accent-main)]/30 transition-all duration-500 cursor-pointer overflow-hidden"
-            >
-              <div className="relative z-10">
-                <div className="flex items-center justify-center w-16 h-16 bg-[var(--bg-hover)] rounded-2xl mb-10 group-hover:bg-[var(--accent-main)] transition-colors duration-500 group-hover:text-white text-[var(--accent-main)]">
-                  <MessageSquare className="w-8 h-8" />
-                </div>
-
-                <h2 className="text-3xl font-black text-[var(--text-primary)] mb-6 flex items-center justify-between">
-                  MBTI 创作实验室
-                  <ArrowRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0" />
-                </h2>
-
-                <p className="text-[var(--text-secondary)] text-lg mb-10 leading-relaxed">
-                  与五位性格迥异的专家深度对谈。从逻辑推演到感性共鸣，全方位解构您的创作主题。
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {['ENTJ', 'ISTJ', 'ENFP', 'INFP', 'ENFJ'].map(role => (
-                    <span key={role} className="px-3 py-1 bg-[var(--bg-hover)] text-[var(--text-tertiary)] rounded-lg text-[10px] font-bold border border-[var(--border-light)]">
-                      {role}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </Link>
-
-          {/* Love and Deepspace Mode */}
-          <Link href="/lysk">
-            <motion.div
-              whileHover={{ y: -8 }}
-              className="group relative bg-[var(--bg-panel)] rounded-[3rem] p-12 border border-[var(--border-light)] hover:border-[var(--accent-main)]/30 transition-all duration-500 cursor-pointer overflow-hidden"
-            >
-              <div className="relative z-10">
-                <div className="flex items-center justify-center w-16 h-16 bg-[var(--bg-hover)] rounded-2xl mb-10 group-hover:bg-[var(--accent-main)] transition-colors duration-500 group-hover:text-white text-[var(--accent-main)]">
-                  <Sparkles className="w-8 h-8" />
-                </div>
-
-                <h2 className="text-3xl font-black text-[var(--text-primary)] mb-6 flex items-center justify-between">
-                  极夜编辑器
-                  <ArrowRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0" />
-                </h2>
-
-                <p className="text-[var(--text-secondary)] text-lg mb-10 leading-relaxed">
-                  在深邃的交互中捕捉那些微妙且动人的瞬间。适合需要极致细腻感触的同人与随笔创作。
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'].map(name => (
-                    <span key={name} className="px-3 py-1 bg-[var(--bg-hover)] text-[var(--text-tertiary)] rounded-lg text-[10px] font-bold border border-[var(--border-light)]">
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </Link>
-        </div>
+        {/* Content removed to move items to dropdown */}
 
         <motion.div
           initial={{ opacity: 0 }}
