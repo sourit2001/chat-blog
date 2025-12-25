@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { google } from "@ai-sdk/google";
+import { generateText } from "ai";
 
 const REPLICATE_VERSION = "43b17801b02267d0baf70071ff440358f75499f20ad5c51118a2fdad14ba9b8c";
 
@@ -13,6 +15,12 @@ const voicePresets: Record<string, string> = {
   qiyu: "Chinese (Mandarin)_Straightforward_Boy",          // 祁煜：直率少年（活泼直接）
   lishen: "Chinese (Mandarin)_Gentleman",                  // 黎深：绅士温和男声
   xiayizhou: "Chinese (Mandarin)_Southern_Young_Man",      // 夏以昼：南方年轻人（温暖亲切）
+  // MBTI 角色声音：
+  ENTJ: "Chinese (Mandarin)_Gentle_Senior",
+  ISTJ: "Chinese (Mandarin)_Gentleman",
+  ENFP: "Chinese (Mandarin)_Pure-hearted_Boy",
+  INFP: "Chinese (Mandarin)_Soft_Girl",
+  ENFJ: "Chinese (Mandarin)_Refreshing_Young_Man",
 };
 
 export async function POST(req: NextRequest) {
@@ -34,7 +42,28 @@ export async function POST(req: NextRequest) {
     }
 
     const voice_id = voicePresets[voice as keyof typeof voicePresets] || voicePresets.female;
-    console.log(`TTS request: voice=${voice}, voice_id=${voice_id}, text=${text.slice(0, 50)}...`);
+
+    // 智能情绪识别：使用 Gemini Flash 快速分析文本情感
+    let detectedEmotion = "happy"; // 默认为开心
+    try {
+      const { text: sentiment } = await generateText({
+        model: google("gemini-2.5-flash"),
+        system: "Analyze the sentiment of the text. Return exactly one of: neutral, happy, sad, angry, fearful, surprised, calm. Focus on the predominant emotion.",
+        prompt: text,
+      });
+      const cleaned = sentiment.trim().toLowerCase();
+      // 更加鲁棒的关键词匹配
+      const emotions = ["neutral", "happy", "sad", "angry", "fearful", "surprised", "calm"];
+      const matched = emotions.find(e => cleaned.includes(e));
+      if (matched) {
+        detectedEmotion = matched;
+      }
+    } catch (e: any) {
+      console.warn("Sentiment analysis failed:", e?.message || e);
+      console.warn("Fallback to happy");
+    }
+
+    console.log(`TTS request: voice=${voice}, voice_id=${voice_id}, emotion=${detectedEmotion}, text=${text.slice(0, 50)}...`);
 
     const createRes = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -47,7 +76,7 @@ export async function POST(req: NextRequest) {
         input: {
           text,
           voice_id,
-          emotion: "neutral",
+          emotion: detectedEmotion,
           language_boost: "Chinese",
           english_normalization: false,
         },

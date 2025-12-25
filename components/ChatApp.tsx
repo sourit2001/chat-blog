@@ -811,7 +811,7 @@ export default function ChatApp() {
   const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [ttsVoice, setTtsVoice] = useState<'female' | 'male' | 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'>(viewMode === 'game' ? 'male' : 'female');
+  const [ttsVoice, setTtsVoice] = useState<'female' | 'male' | 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou' | 'ENTJ' | 'ISTJ' | 'ENFP' | 'INFP' | 'ENFJ'>(viewMode === 'game' ? 'male' : 'female');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('text');
   // Conversation storage
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -1188,19 +1188,26 @@ export default function ChatApp() {
       if (viewMode === 'game') {
         const speakerMatch = sentence.match(/^(沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/);
         if (speakerMatch) {
-          const speakerVoiceMap: Record<string, 'shenxinghui' | 'qinche' | 'qiyu' | 'lishen' | 'xiayizhou'> = {
+          const speakerVoiceMap: Record<string, string> = {
             '沈星回': 'shenxinghui',
             '秦彻': 'qinche',
             '祁煜': 'qiyu',
             '黎深': 'lishen',
             '夏以昼': 'xiayizhou',
           };
-          voice = speakerVoiceMap[speakerMatch[1]] || 'shenxinghui';
+          voice = (speakerVoiceMap[speakerMatch[1]] || 'shenxinghui') as any;
           // 去掉角色前缀，只播报内容
           textToSpeak = sentence.replace(/^(沈星回|秦彻|祁煜|黎深|夏以昼)[：:]/, '');
         }
       }
-      // MBTI 模式：保留角色前缀，统一用一个声音
+
+      // MBTI 模式：检测角色前缀并切换声音
+      if (viewMode === 'mbti') {
+        const mbtiMatch = sentence.match(/^(ENTJ|ISTJ|ENFP|INFP|ENFJ)[：:]/);
+        if (mbtiMatch) {
+          voice = mbtiMatch[1] as any;
+        }
+      }
 
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -1372,7 +1379,62 @@ export default function ChatApp() {
       return;
     }
 
-    // MBTI 模式：保持原有整段播报逻辑
+    // MBTI 模式：按角色前缀拆分播放
+    if (viewMode === 'mbti') {
+      const segmentRegex = /^(ENTJ|ISTJ|ENFP|INFP|ENFJ)[：:]([\s\S]*?)(?=^(?:ENTJ|ISTJ|ENFP|INFP|ENFJ)[：:]|$)/gm;
+      const segments: { speaker: string; voice: string; text: string }[] = [];
+
+      let match: RegExpExecArray | null;
+      while ((match = segmentRegex.exec(text)) !== null) {
+        const speaker = match[1];
+        const content = match[2]?.trim();
+        if (content) {
+          segments.push({ speaker, voice: speaker as any, text: `${speaker}：${content}` });
+        }
+      }
+
+      // 退化逻辑
+      if (segments.length === 0) {
+        segments.push({ speaker: '小组', voice: 'ENFJ', text });
+      }
+
+      setTtsError(null);
+      setTtsLoadingId(messageId);
+
+      try {
+        for (const seg of segments) {
+          const res = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: seg.text, voice: seg.voice }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '生成语音失败');
+          const src = data.audioUrl as string;
+
+          if (!audioRef.current) {
+            audioRef.current = new Audio();
+          } else {
+            audioRef.current.pause();
+          }
+          audioRef.current.src = src;
+          await new Promise<void>((resolve) => {
+            if (!audioRef.current) return resolve();
+            audioRef.current.onended = () => resolve();
+            audioRef.current.play().catch(() => resolve());
+          });
+        }
+        lastSpokenMessageIdRef.current = messageId;
+      } catch (err: any) {
+        console.error('MBTI TTS failed', err);
+        setTtsError(err?.message || '生成语音失败');
+      } finally {
+        setTtsLoadingId(null);
+      }
+      return;
+    }
+
+    // 默认兜底逻辑
     let textToSpeak = text;
     setTtsError(null);
     setTtsLoadingId(messageId);
@@ -1385,18 +1447,6 @@ export default function ChatApp() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '生成语音失败');
       const src = data.audioUrl as string;
-      // save audio record (tts)
-      try {
-        if (lastAssistantDbIdRef.current && src && supabaseClient) {
-          await supabaseClient.from('audio_records').insert({
-            message_id: lastAssistantDbIdRef.current,
-            type: 'tts',
-            url: src,
-          });
-        }
-      } catch (e) {
-        console.warn('save audio url failed:', (e as any)?.message);
-      }
       if (!audioRef.current) {
         audioRef.current = new Audio();
       } else {
@@ -1406,8 +1456,8 @@ export default function ChatApp() {
       await audioRef.current.play();
       lastSpokenMessageIdRef.current = messageId;
     } catch (err: any) {
-      console.error('Gemini TTS failed', err);
-      setTtsError(err?.message || '生成语音失败，请稍后再试');
+      console.error('TTS failed', err);
+      setTtsError(err?.message || '生成语音失败');
     } finally {
       setTtsLoadingId(null);
     }
