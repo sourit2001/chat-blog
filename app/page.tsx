@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { Sparkles, Users, MessageSquare, Heart, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -7,11 +8,24 @@ import { Logo } from "@/components/Logo";
 import { UserStatus } from '@/components/UserStatus';
 
 export default function Home() {
+  useEffect(() => {
+    // Force set the "Amber" (Orange) theme variables for the landing page
+    const root = document.documentElement;
+    root.style.setProperty('--bg-page', '#FFFBEB');
+    root.style.setProperty('--bg-panel', '#FFFBEB');
+    root.style.setProperty('--accent-main', '#F59E0B');
+    root.style.setProperty('--text-primary', '#0f172a');
+    root.style.setProperty('--text-secondary', '#475569');
+    root.style.setProperty('--text-tertiary', '#94a3b8');
+    root.style.setProperty('--bg-hover', '#FEF3C7'); // Amber-100ish
+    root.style.setProperty('--border-light', '#FDE68A'); // Amber-200ish
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10 flex flex-col items-center justify-center p-6 overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-blue-300 to-orange-300 text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10 flex flex-col items-center justify-center p-6 overflow-hidden relative">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-8 md:px-16 z-50">
-        <Logo className="w-10 h-10" showText={true} />
+        <Logo className="w-10 h-10" showText={true} accentColor="#F59E0B" />
         <div className="flex items-center gap-6">
           <Link href="/blog" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-medium transition-colors">
             我的作品
@@ -37,7 +51,7 @@ export default function Home() {
             </div>
           </div>
           <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.9]">
-            <span className="text-[var(--text-primary)]">
+            <span className="text-[#2563EB]">
               Chat2<span className="text-[var(--accent-main)]">Blog</span>
             </span>
           </h1>

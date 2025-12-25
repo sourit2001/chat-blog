@@ -32,7 +32,7 @@ export default function BlogListPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10">
+        <div className="min-h-screen text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10" style={{ background: 'var(--bg-page)' }}>
             {/* Header */}
             <header className="fixed top-0 left-0 right-0 h-20 bg-[var(--bg-page)]/80 backdrop-blur-xl border-b border-[var(--border-light)] z-50 px-6 md:px-12 flex items-center justify-between">
                 <div className="flex items-center gap-6">
@@ -43,7 +43,7 @@ export default function BlogListPage() {
                         <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
                     </button>
                     <div className="h-6 w-px bg-[var(--border-light)]" />
-                    <Logo className="w-8 h-8 opacity-90" showText={true} />
+                    <Logo className="w-8 h-8 opacity-90" showText={true} accentColor="var(--accent-main)" />
                 </div>
                 <div className="flex items-center gap-6">
                     <div className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--text-tertiary)] hidden md:block">My Collection</div>

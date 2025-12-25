@@ -90,7 +90,8 @@ export function UserStatus({ className, isSidebar = false }: UserStatusProps) {
                                 signOut();
                                 setIsOpen(false);
                             }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--accent-main)] hover:bg-[var(--accent-main)] hover:text-white rounded-xl transition-colors font-medium"
+                            style={{ '--tw-bg-opacity': '0.1' } as any}
                         >
                             <LogOut className="w-4 h-4" />
                             <span>退出登录</span>

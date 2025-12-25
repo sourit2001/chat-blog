@@ -67,7 +67,7 @@ const themes = {
   amber: {
     name: '晨晖金',
     bg: 'bg-[#FFFBEB]',
-    pageBg: '#FFFBEB',
+    pageBg: 'linear-gradient(135deg, #93c5fd 0%, #fdba74 100%)', // Blue-300 to Orange-300
     text: 'text-slate-900',
     accent: '#F59E0B',
     button: 'bg-[#F59E0B] hover:bg-[#D97706] text-white shadow-lg shadow-amber-500/20',
@@ -798,7 +798,7 @@ export default function ChatApp() {
   const inputRef = useRef(inputValue);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [sttError, setSttError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<keyof typeof themes>('emerald');
+  const [theme, setTheme] = useState<keyof typeof themes>('amber');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Legacy theme mapping fix
@@ -1599,7 +1599,10 @@ export default function ChatApp() {
   };
 
   return (
-    <div className={`relative flex h-[100dvh] w-full overflow-hidden bg-[var(--bg-page)] font-sans ${themes[selectedTheme].text}`}>
+    <div
+      className={`relative flex h-[100dvh] w-full overflow-hidden font-sans ${themes[selectedTheme].text}`}
+      style={{ background: 'var(--bg-page)' }}
+    >
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isMobileSidebarOpen && (
@@ -1615,15 +1618,16 @@ export default function ChatApp() {
 
       {/* --- Sidebar Area (Desktop & Mobile) --- */}
       <aside
-        className={`fixed inset-y-0 left-0 lg:relative flex flex-col border-r border-[var(--border-light)] bg-[var(--bg-page)] z-[70] lg:z-30 transition-all duration-500 ease-in-out overflow-hidden 
+        className={`fixed inset-y-0 left-0 lg:relative flex flex-col border-r border-[var(--border-light)] z-[70] lg:z-30 transition-all duration-500 ease-in-out overflow-hidden 
           ${isMobileSidebarOpen ? 'w-[280px] translate-x-0 shadow-2xl' : 'w-0 -translate-x-full lg:translate-x-0'}
           ${isSidebarVisible ? 'lg:w-64' : 'lg:w-0 lg:border-r-0'}
         `}
+        style={{ background: 'var(--bg-page)' }}
       >
         <div className="w-[280px] lg:w-[256px] flex flex-col h-full">
           {/* Top: Logo */}
           <div className="p-8">
-            <Logo className={`w-8 h-8 opacity-90`} showText={true} />
+            <Logo className="w-8 h-8 opacity-90" showText={true} accentColor={themes[selectedTheme].accent} />
           </div>
 
           {/* Mid: Creation Section */}
@@ -1776,7 +1780,7 @@ export default function ChatApp() {
             >
               <Menu className="w-5 h-5 text-[var(--text-secondary)]" />
             </button>
-            <Logo className={`w-7 h-7 opacity-90 ${isDarkMode ? 'invert' : ''}`} />
+            <Logo className="w-7 h-7 opacity-90" showText={true} accentColor={themes[selectedTheme].accent} />
           </div>
           <div className="flex items-center gap-3">
             <UserStatus />
@@ -1875,7 +1879,10 @@ export default function ChatApp() {
                   className={`mb-4 p-4 rounded-2xl border shadow-2xl flex items-center justify-between ${selectedBg.url ? 'bg-white/80' : 'bg-slate-50 border-slate-200'}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400">
+                    <div
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: `${themes[selectedTheme].accent}33`, color: themes[selectedTheme].accent } as any}
+                    >
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
@@ -1892,7 +1899,8 @@ export default function ChatApp() {
                         localStorage.setItem('chat2blog_draft', JSON.stringify({ title: blogDraft.title, content: blogDraft.markdown }));
                         router.push('/publish');
                       }}
-                      className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-500 transition-all flex items-center gap-2"
+                      className="px-4 py-2 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2"
+                      style={{ backgroundColor: themes[selectedTheme].accent } as any}
                     >
                       <Globe className="w-4 h-4" /> 立即发布
                     </button>
@@ -1928,15 +1936,26 @@ export default function ChatApp() {
                     className="flex-1 bg-transparent border-none outline-none py-4 max-h-48 resize-none text-[15px] font-medium placeholder-slate-400"
                   />
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all ${interactionMode === 'voice' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    <span
+                      className="text-[10px] font-bold px-2 py-1 rounded-md border transition-all"
+                      style={{
+                        backgroundColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}15` : '#f1f5f9',
+                        color: interactionMode === 'voice' ? themes[selectedTheme].accent : '#64748b',
+                        borderColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}33` : '#e2e8f0'
+                      } as any}
+                    >
                       {interactionMode === 'voice' ? '语音回复' : '仅文字'}
                     </span>
                     <button
                       type="button"
                       onClick={toggleRecording}
-                      className={`p-2 rounded-xl transition-all ${isRecording ? "text-red-500 bg-red-50" : "text-slate-400 hover:bg-slate-100"}`}
+                      className={`p-2 rounded-xl transition-all ${isRecording ? "text-red-500 bg-red-50" : "text-slate-400"}`}
+                      style={!isRecording ? { '--tw-bg-opacity': '1' } as any : {}}
                     >
-                      <Mic className="w-5 h-5" />
+                      <Mic
+                        className="w-5 h-5 transition-colors"
+                        style={{ color: isRecording ? '#ef4444' : (interactionMode === 'voice' ? themes[selectedTheme].accent : undefined) }}
+                      />
                     </button>
                   </div>
                 </div>
@@ -2133,7 +2152,12 @@ export default function ChatApp() {
                           onClick={() => {
                             setSelectedRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r].slice(0, 5));
                           }}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${selectedRoles.includes(r) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-white/5 text-[#a3a3a3] border-white/5'}`}
+                          className="px-3 py-2 rounded-xl text-xs font-bold border transition-colors"
+                          style={{
+                            backgroundColor: selectedRoles.includes(r) ? `${themes[selectedTheme].accent}15` : 'rgba(255,255,255,0.05)',
+                            color: selectedRoles.includes(r) ? themes[selectedTheme].accent : '#a3a3a3',
+                            borderColor: selectedRoles.includes(r) ? `${themes[selectedTheme].accent}4d` : 'rgba(255,255,255,0.05)'
+                          } as any}
                         >
                           {r}
                         </button>
@@ -2176,12 +2200,12 @@ export default function ChatApp() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-white shadow-2xl z-[101] border-l border-slate-100 flex flex-col"
+              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-[var(--bg-page)] shadow-2xl z-[101] border-l border-[var(--border-light)] flex flex-col"
             >
-              <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+              <div className="p-6 border-b border-[var(--border-light)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Palette className="w-6 h-6 text-indigo-500" />
-                  <h3 className="text-lg font-black text-slate-900">视觉风格</h3>
+                  <Palette className="w-6 h-6 text-[var(--accent-main)]" />
+                  <h3 className="text-lg font-black text-[var(--text-primary)]">视觉风格</h3>
                 </div>
                 <button onClick={() => setIsAppearanceDrawerOpen(false)} className="p-2 hover:bg-slate-50 text-slate-400 rounded-lg transition-colors">
                   <Plus className="w-5 h-5 rotate-45" />
@@ -2191,19 +2215,19 @@ export default function ChatApp() {
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                 {/* Theme Selection */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">配色方案</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-tertiary)]">配色方案</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(themes).map(([key, value]) => (
                       <button
                         key={key}
                         onClick={() => setSelectedTheme(key as keyof typeof themes)}
-                        className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${selectedTheme === key ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-slate-200'}`}
+                        className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${selectedTheme === key ? 'border-[var(--accent-main)] bg-[var(--bg-hover)]' : 'border-[var(--border-light)] hover:border-[var(--accent-main)]/30'}`}
                       >
                         <div
                           className="w-10 h-10 rounded-full shadow-inner"
                           style={{ backgroundColor: value.accent }}
                         />
-                        <span className="text-xs font-bold text-slate-700">{value.name}</span>
+                        <span className="text-xs font-bold text-[var(--text-secondary)]">{value.name}</span>
                       </button>
                     ))}
                   </div>
@@ -2211,13 +2235,13 @@ export default function ChatApp() {
 
                 {/* Background Selection */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">聊天背景</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-tertiary)]">聊天背景</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {chatBackgrounds.map((bg) => (
                       <button
                         key={bg.id}
                         onClick={() => setSelectedBg(bg)}
-                        className={`group relative h-24 rounded-2xl border-2 overflow-hidden transition-all ${selectedBg.id === bg.id ? 'border-indigo-500' : 'border-slate-100 hover:border-slate-200'}`}
+                        className={`group relative h-24 rounded-2xl border-2 overflow-hidden transition-all ${selectedBg.id === bg.id ? 'border-[var(--accent-main)]' : 'border-[var(--border-light)] hover:border-[var(--accent-main)]/30'}`}
                       >
                         {bg.url ? (
                           <img src={bg.url} alt={bg.name} className="absolute inset-0 w-full h-full object-cover" />
@@ -2233,15 +2257,15 @@ export default function ChatApp() {
                 </div>
 
                 {/* Ambient Sound Section */}
-                <div className="space-y-4 pt-4 border-t border-slate-50">
+                <div className="space-y-4 pt-4 border-t border-[var(--border-light)]">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col gap-1">
-                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">背景白噪音</h4>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-widest">沉浸式聆听雨声或微风</p>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-tertiary)]">背景白噪音</h4>
+                      <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-widest">沉浸式聆听雨声或微风</p>
                     </div>
                     <button
                       onClick={() => setIsAmbientPlaying(!isAmbientPlaying)}
-                      className={`w-12 h-6 rounded-full transition-colors relative ${isAmbientPlaying ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${isAmbientPlaying ? 'bg-[var(--accent-main)]' : 'bg-[var(--border-light)]'}`}
                     >
                       <motion.div
                         animate={{ x: isAmbientPlaying ? 26 : 2 }}
@@ -2278,6 +2302,6 @@ export default function ChatApp() {
           </>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }
