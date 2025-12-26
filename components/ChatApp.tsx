@@ -725,7 +725,11 @@ export default function ChatApp() {
     redlines: string;
     extras: string;
   };
+  type SavedPersona = UserPersona & { id: string };
   const emptyPersona: UserPersona = { name: '', mbti: '', likes: '', schedule: '', work: '', redlines: '', extras: '' };
+
+  const [savedPersonas, setSavedPersonas] = useState<SavedPersona[]>([]);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('default');
   const [userPersona, setUserPersona] = useState<UserPersona>(emptyPersona);
   const formatPersonaToPrompt = (p: UserPersona) => {
     const lines: string[] = [];
@@ -739,25 +743,82 @@ export default function ChatApp() {
     return lines.join('\n');
   };
   const userProfile = formatPersonaToPrompt(userPersona);
+  const savedPersonasKey = 'chat_saved_personas_v2';
+
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(userProfileStorageKey);
+      const saved = window.localStorage.getItem(savedPersonasKey);
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<UserPersona>;
-        setUserPersona({ ...emptyPersona, ...parsed });
+        const parsed = JSON.parse(saved) as { personas: SavedPersona[], selectedId: string };
+        setSavedPersonas(parsed.personas || []);
+        setSelectedPersonaId(parsed.selectedId || 'default');
+        const active = parsed.personas.find(p => p.id === parsed.selectedId) || parsed.personas[0];
+        if (active) setUserPersona(active);
         return;
       }
-      const legacy = window.localStorage.getItem(legacyUserProfileStorageKey);
-      if (legacy && legacy.trim()) {
-        setUserPersona({ ...emptyPersona, extras: legacy.trim() });
-        window.localStorage.setItem(userProfileStorageKey, JSON.stringify({ ...emptyPersona, extras: legacy.trim() }));
+
+      // Migration from single persona
+      const single = window.localStorage.getItem(userProfileStorageKey);
+      if (single) {
+        const parsed = JSON.parse(single) as UserPersona;
+        const initialPersona = { ...parsed, id: 'default' };
+        setSavedPersonas([initialPersona]);
+        setSelectedPersonaId('default');
+        setUserPersona(parsed);
+        window.localStorage.setItem(savedPersonasKey, JSON.stringify({ personas: [initialPersona], selectedId: 'default' }));
+      } else {
+        const initialPersona = { ...emptyPersona, name: '默认人设', id: 'default' };
+        setSavedPersonas([initialPersona]);
+        setSelectedPersonaId('default');
+        setUserPersona(initialPersona);
       }
     } catch { }
   }, []);
-  const persistUserPersona = (next: UserPersona) => {
+
+  const persistSavedPersonas = (personas: SavedPersona[], selectedId: string) => {
     try {
-      window.localStorage.setItem(userProfileStorageKey, JSON.stringify(next));
+      window.localStorage.setItem(savedPersonasKey, JSON.stringify({ personas, selectedId }));
     } catch { }
+  };
+
+  const handleCreatePersona = () => {
+    const newId = Date.now().toString();
+    const newPersona: SavedPersona = { ...emptyPersona, name: `新的人设 ${savedPersonas.length + 1}`, id: newId };
+    const nextSaved = [...savedPersonas, newPersona];
+    setSavedPersonas(nextSaved);
+    setSelectedPersonaId(newId);
+    setUserPersona(newPersona);
+    persistSavedPersonas(nextSaved, newId);
+  };
+
+  const handleDeletePersona = (id: string) => {
+    if (savedPersonas.length <= 1) return;
+    const nextSaved = savedPersonas.filter(p => p.id !== id);
+    setSavedPersonas(nextSaved);
+    if (selectedPersonaId === id) {
+      const fallback = nextSaved[0];
+      setSelectedPersonaId(fallback.id);
+      setUserPersona(fallback);
+      persistSavedPersonas(nextSaved, fallback.id);
+    } else {
+      persistSavedPersonas(nextSaved, selectedPersonaId);
+    }
+  };
+
+  const handleSelectPersona = (id: string) => {
+    const active = savedPersonas.find(p => p.id === id);
+    if (active) {
+      setSelectedPersonaId(id);
+      setUserPersona(active);
+      persistSavedPersonas(savedPersonas, id);
+    }
+  };
+
+  const updateActivePersona = (next: UserPersona) => {
+    setUserPersona(next);
+    const nextSaved = savedPersonas.map(p => p.id === selectedPersonaId ? { ...next, id: p.id } : p);
+    setSavedPersonas(nextSaved);
+    persistSavedPersonas(nextSaved, selectedPersonaId);
   };
   const gameRequestHeaders = {
     'x-view-mode': 'game',
@@ -1797,18 +1858,15 @@ export default function ChatApp() {
         {(viewMode === 'game' || viewMode === 'mbti') && (
           <div className="px-4 py-2 border-b border-[var(--border-light)] bg-[var(--bg-panel)]/40 backdrop-blur-sm">
             <div className="max-w-4xl mx-auto flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsPersonaDrawerOpen(true)}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
                 <span className="text-[var(--text-tertiary)]">当前身份：</span>
                 <span className={`font-bold ${userPersona.name ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)] opacity-70'}`}>
                   {userPersona.name || '未配置人设'}
                 </span>
                 {userPersona.name && <span className="px-1.5 py-0.5 rounded bg-[var(--accent-main)]/10 text-[10px] text-[var(--accent-main)] uppercase border border-[var(--accent-main)]/20">{userPersona.mbti || 'MBTI'}</span>}
-              </div>
-              <button
-                onClick={() => setIsPersonaDrawerOpen(true)}
-                className="text-[var(--accent-main)] hover:opacity-80 transition-colors font-bold"
-              >
-                修改
               </button>
             </div>
           </div>
@@ -2045,99 +2103,111 @@ export default function ChatApp() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-[var(--bg-page)] shadow-2xl z-[101] border-l border-[var(--border-light)] flex flex-col"
+              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-white/95 backdrop-blur-2xl shadow-2xl z-[101] border-l border-slate-200 flex flex-col"
             >
-              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <UserCircle className="w-6 h-6 text-[var(--accent-main)]" />
-                  <h3 className="text-lg font-black text-[var(--text-primary)]">人设配置</h3>
+                  <h3 className="text-lg font-black text-slate-800">人设配置</h3>
                 </div>
-                <button onClick={() => setIsPersonaDrawerOpen(false)} className="p-2 hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] rounded-lg transition-colors">
+                <button onClick={() => setIsPersonaDrawerOpen(false)} className="p-2 hover:bg-slate-100 text-slate-400 rounded-lg transition-colors">
                   <Plus className="w-5 h-5 rotate-45" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Persona Selector */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">已存人设</label>
+                    <button
+                      onClick={handleCreatePersona}
+                      className="text-[10px] font-bold text-[var(--accent-main)] hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> 新建人设
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {savedPersonas.map(p => (
+                      <div key={p.id} className="group relative">
+                        <button
+                          onClick={() => handleSelectPersona(p.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedPersonaId === p.id
+                            ? 'bg-[var(--accent-main)] text-white border-[var(--accent-main)] shadow-sm'
+                            : 'bg-[var(--bg-panel)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--accent-main)]'
+                            }`}
+                        >
+                          {p.name || '未命名'}
+                        </button>
+                        {savedPersonas.length > 1 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeletePersona(p.id); }}
+                            className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-800 text-white rounded-full flex items-center justify-center scale-0 group-hover:scale-100 transition-transform hover:bg-red-500"
+                          >
+                            <Plus className="w-2.5 h-2.5 rotate-45" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">人设名</label>
                     <input
                       value={userPersona.name}
-                      onChange={(e) => {
-                        const next = { ...userPersona, name: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
+                      onChange={(e) => updateActivePersona({ ...userPersona, name: e.target.value })}
                       placeholder="你的创作者昵称"
-                      className="w-full bg-[var(--bg-panel)] border border-[var(--border-light)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] placeholder:[var(--text-tertiary)] focus:ring-1 focus:ring-[var(--accent-main)]/50 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:ring-1 focus:ring-[var(--accent-main)]/50 outline-none"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">MBTI</label>
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">MBTI</label>
                       <input
                         value={userPersona.mbti}
-                        onChange={(e) => {
-                          const next = { ...userPersona, mbti: e.target.value };
-                          setUserPersona(next);
-                          persistUserPersona(next);
-                        }}
+                        onChange={(e) => updateActivePersona({ ...userPersona, mbti: e.target.value })}
                         placeholder="e.g. INFP"
-                        className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">作息</label>
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">作息</label>
                       <input
                         value={userPersona.schedule}
-                        onChange={(e) => {
-                          const next = { ...userPersona, schedule: e.target.value };
-                          setUserPersona(next);
-                          persistUserPersona(next);
-                        }}
+                        onChange={(e) => updateActivePersona({ ...userPersona, schedule: e.target.value })}
                         placeholder="e.g. 熬夜党"
-                        className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">偏好/喜欢</label>
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">偏好/喜欢</label>
                     <input
                       value={userPersona.likes}
-                      onChange={(e) => {
-                        const next = { ...userPersona, likes: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
+                      onChange={(e) => updateActivePersona({ ...userPersona, likes: e.target.value })}
                       placeholder="e.g. 抹茶、摄影"
-                      className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">雷点/禁忌</label>
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">雷点/禁忌</label>
                     <input
                       value={userPersona.redlines}
-                      onChange={(e) => {
-                        const next = { ...userPersona, redlines: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
+                      onChange={(e) => updateActivePersona({ ...userPersona, redlines: e.target.value })}
                       placeholder="避免提到的内容"
-                      className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">补充描述</label>
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">补充描述</label>
                     <textarea
                       value={userPersona.extras}
-                      onChange={(e) => {
-                        const next = { ...userPersona, extras: e.target.value };
-                        setUserPersona(next);
-                        persistUserPersona(next);
-                      }}
+                      onChange={(e) => updateActivePersona({ ...userPersona, extras: e.target.value })}
                       rows={4}
                       placeholder="想让 AI 记住的其他细节..."
-                      className="w-full bg-[#fcfaf2] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none resize-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none resize-none"
                     />
                   </div>
                 </div>
@@ -2167,16 +2237,16 @@ export default function ChatApp() {
                 )}
               </div>
 
-              <div className="p-6 border-t border-[var(--border-light)] space-y-4 bg-[var(--bg-page)]">
-                <div className="flex items-center justify-between text-[11px] text-[var(--text-tertiary)]">
-                  <span>设置将自动加密保存至本地</span>
-                  <button onClick={() => { setUserPersona(emptyPersona); persistUserPersona(emptyPersona); }} className="hover:text-red-400">重置人设</button>
+              <div className="p-6 border-t border-slate-100 space-y-4 bg-white">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>人设将持续保存并应用于所有对话</span>
+                  <button onClick={() => updateActivePersona(emptyPersona)} className="hover:text-red-400 font-bold transition-colors">重置当前</button>
                 </div>
                 <button
                   onClick={() => setIsPersonaDrawerOpen(false)}
-                  className="w-full py-4 bg-[var(--accent-main)] text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:opacity-90 transition-all"
+                  className="w-full py-4 bg-[var(--accent-main)] text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:opacity-90 shadow-lg shadow-[var(--accent-main)]/20 transition-all"
                 >
-                  确定
+                  确认并关闭
                 </button>
               </div>
             </motion.aside>
