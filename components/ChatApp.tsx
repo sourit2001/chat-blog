@@ -468,9 +468,23 @@ const getRoleLabel = (role: string, mode: ViewMode) => {
   return role;
 };
 
+const getRoleAvatar = (role: string, mode: ViewMode) => {
+  if (mode === 'game') {
+    switch (role) {
+      case 'ENTJ': return '/mbti/avatars/祁煜.jpg';
+      case 'ISTJ': return '/mbti/avatars/黎深.jpg';
+      case 'ENFP': return '/mbti/avatars/沈星回.jpg';
+      case 'INFP': return '/mbti/avatars/夏以昼.jpg';
+      case 'ENFJ': return '/mbti/avatars/秦彻.jpg';
+      default: return null;
+    }
+  }
+  return null;
+};
+
 const getRoleAvatarClass = (role: string, mode: ViewMode) => {
   // Use subtle, consistent colors instead of vibrant gradients
-  return 'bg-[var(--bg-hover)]';
+  return 'bg-[var(--bg-hover)] overflow-hidden';
 };
 
 const getRoleStatusText = (role: string, mode: ViewMode) => {
@@ -563,11 +577,15 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
 
       {visibleRoles.map((block) => (
         <div key={`${messageId}-${block.role}`} className="flex gap-3">
-          <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-black/5`}>
+          <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-black/5 overflow-hidden`}>
             {viewMode === 'game' ? (
-              <span className="text-[10px] font-bold text-slate-400">
-                {getRoleLabel(block.role, viewMode)}
-              </span>
+              getRoleAvatar(block.role, viewMode) ? (
+                <img src={getRoleAvatar(block.role, viewMode)!} alt={getRoleLabel(block.role, viewMode)} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[10px] font-bold text-slate-400">
+                  {getRoleLabel(block.role, viewMode)}
+                </span>
+              )
             ) : (
               <span className="text-xl">{getRoleEmoji(block.role, viewMode)}</span>
             )}
@@ -593,9 +611,11 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
               className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400`}
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center bg-white/60`}
+                className={`w-5 h-5 rounded-full flex items-center justify-center bg-white/60 overflow-hidden`}
               >
-                {viewMode !== 'game' && (
+                {viewMode === 'game' && getRoleAvatar(role, viewMode) ? (
+                  <img src={getRoleAvatar(role, viewMode)!} alt={getRoleLabel(role, viewMode)} className="w-full h-full object-cover" />
+                ) : (
                   <span className="text-[10px]">{getRoleEmoji(role, viewMode)}</span>
                 )}
               </div>
