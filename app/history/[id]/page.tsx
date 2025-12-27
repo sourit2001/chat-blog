@@ -2,19 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { UserStatus } from '@/components/UserStatus';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Users,
+  Sparkles,
+  BookOpen,
+  History,
+  Heart,
+  Menu,
+  X
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export const dynamic = 'force-dynamic';
 
 export default function ConversationDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
+
+  const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(false);
+  const [isCommunityDropdownOpen, setIsCommunityDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -62,13 +81,12 @@ export default function ConversationDetailPage() {
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
         if (msgsErr) throw msgsErr;
-        
-        // Manual sort to handle identical timestamps: User always comes before Assistant if times are equal
+
+        // Manual sort to handle identical timestamps
         const sortedMsgs = (msgs || []).sort((a: any, b: any) => {
           const tA = new Date(a.created_at).getTime();
           const tB = new Date(b.created_at).getTime();
           if (tA !== tB) return tA - tB;
-          // If times are equal, User should come first
           if (a.role === 'user' && b.role === 'assistant') return -1;
           if (a.role === 'assistant' && b.role === 'user') return 1;
           return 0;
@@ -85,80 +103,250 @@ export default function ConversationDetailPage() {
   }, [id]);
 
   return (
-    <main className="relative flex flex-col min-h-screen overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-emerald-50 via-teal-50 to-lime-50" />
-      <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
-        <div className="mb-6 flex items-center justify-between">
-          <Logo className="w-8 h-8" showText={false} />
-          <Link href="/history" className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline">← 返回列表</Link>
+    <main className="relative flex flex-col min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-sans">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-white/40 backdrop-blur-md border-b border-[var(--border-light)]">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => router.back()}
+            className="p-2 -ml-2 hover:bg-[var(--bg-hover)] rounded-xl transition-all group"
+          >
+            <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)]" />
+          </button>
+          <div className="h-6 w-px bg-[var(--border-light)]" />
+          <Link href="/">
+            <Logo className="w-8 h-8 md:w-9 md:h-9" showText={true} accentColor="#F59E0B" />
+          </Link>
+
+          <div className="hidden lg:flex items-center gap-8 ml-4">
+            <div
+              className="relative"
+              onMouseEnter={() => setIsChatDropdownOpen(true)}
+              onMouseLeave={() => setIsChatDropdownOpen(false)}
+            >
+              <button className="flex items-center gap-1 text-[13px] font-bold text-slate-700 hover:text-slate-900 transition-colors py-8 uppercase tracking-widest">
+                群聊 <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isChatDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isChatDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-[80%] left-0 w-64 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 mt-1"
+                  >
+                    <div className="space-y-1">
+                      <Link href="/mbti" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800">MBTI 聊天室</p>
+                          <p className="text-[10px] text-slate-500">性格专家的对谈</p>
+                        </div>
+                      </Link>
+                      <Link href="/lysk" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800">极夜编辑器</p>
+                          <p className="text-[10px] text-slate-500">捕捉动人瞬间</p>
+                        </div>
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div
+              className="relative"
+              onMouseEnter={() => setIsCommunityDropdownOpen(true)}
+              onMouseLeave={() => setIsCommunityDropdownOpen(false)}
+            >
+              <button className="flex items-center gap-1 text-[13px] font-bold text-slate-700 hover:text-slate-900 transition-colors py-8 uppercase tracking-widest">
+                工具 <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isCommunityDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isCommunityDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-[80%] left-0 w-64 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 mt-1"
+                  >
+                    <div className="space-y-1">
+                      <Link href="/blog" className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                          <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800">我的作品</p>
+                          <p className="text-[10px] text-slate-500">查看博文草稿</p>
+                        </div>
+                      </Link>
+                      <Link href="/history" className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors group">
+                        <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                          <History className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800">历史记录</p>
+                          <p className="text-[10px] text-slate-500">管理对话历史</p>
+                        </div>
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
-        {loading && <p className="text-sm text-emerald-700">加载中...</p>}
-        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
-        {conversation && (
-          <div className="mb-6 p-4 rounded-2xl bg-white/90 border border-emerald-100 shadow shadow-emerald-100/60 backdrop-blur-md">
-            <h1 className="text-xl font-semibold text-emerald-950">{conversation.title || "未命名会话"}</h1>
-            <p className="text-xs text-emerald-700 mt-1">
-              {conversation.view_mode === 'game' ? '恋与深空' : 'MBTI'} · {new Date(conversation.created_at).toLocaleString()}
-            </p>
+
+        <div className="flex items-center gap-6">
+          <div className="hidden sm:block">
+            <UserStatus />
+          </div>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 text-slate-700 hover:bg-slate-100/50 rounded-xl transition-colors"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            className="fixed inset-0 z-[40] bg-white pt-24 px-6 lg:hidden overflow-y-auto"
+          >
+            <div className="space-y-6 pb-12">
+              <div className="pb-6 border-b border-slate-100">
+                <UserStatus isSidebar={true} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Link href="/mbti" className="p-4 rounded-2xl bg-orange-50 border border-orange-100 text-orange-600 block">
+                  <Users className="w-6 h-6 mb-2" />
+                  <div className="text-sm font-bold">MBTI 聊天</div>
+                </Link>
+                <Link href="/lysk" className="p-4 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 block">
+                  <Sparkles className="w-6 h-6 mb-2" />
+                  <div className="text-sm font-bold">极夜编辑</div>
+                </Link>
+                <Link href="/blog" className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 block">
+                  <BookOpen className="w-6 h-6 mb-2" />
+                  <div className="text-sm font-bold">我的作品</div>
+                </Link>
+                <Link href="/history" className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 block">
+                  <History className="w-6 h-6 mb-2" />
+                  <div className="text-sm font-bold">历史记录</div>
+                </Link>
+              </div>
+              <button
+                onClick={() => router.back()}
+                className="w-full flex items-center justify-center p-4 rounded-xl border border-slate-200 text-slate-600 font-bold"
+              >
+                返回列表
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1 pt-32 p-6 max-w-3xl mx-auto w-full pb-32">
+        {loading && (
+          <div className="flex flex-col items-center py-20 animate-pulse">
+            <div className="w-12 h-12 bg-slate-200 rounded-full mb-4" />
+            <p className="text-sm text-slate-400 font-bold tracking-widest uppercase">Loading Conversation...</p>
           </div>
         )}
-        <div className="space-y-4">
+
+        {error && (
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium">
+            Error: {error}
+          </div>
+        )}
+
+        {conversation && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent-main)] mb-3">
+              <span className="px-2 py-0.5 rounded bg-[var(--accent-main)]/10 border border-[var(--accent-main)]/20">
+                {conversation.view_mode === 'game' ? '恋与深空' : 'MBTI'}
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-400">{new Date(conversation.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>
+            </div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-tight">{conversation.title || "未命名会话"}</h1>
+          </div>
+        )}
+
+        <div className="space-y-6">
           {(() => {
             const pairs: any[] = [];
-            // Robust pairing: pair each assistant with the nearest preceding unpaired user
             let pendingUser: any | null = null;
             for (const msg of messages) {
               if (msg.role === 'user') {
-                // If there was an unpaired previous user, flush it as orphan
                 if (pendingUser) pairs.push({ user: pendingUser, assistant: null });
                 pendingUser = msg;
               } else if (msg.role === 'assistant') {
                 if (pendingUser) {
                   pairs.push({ user: pendingUser, assistant: msg });
-                  pendingUser = null; // consumed
+                  pendingUser = null;
                 } else {
                   pairs.push({ user: null, assistant: msg });
                 }
               } else {
-                // Unknown role: flush if needed as separate card
                 pairs.push({ user: null, assistant: msg });
               }
             }
-            // Tail: if last user had no assistant
             if (pendingUser) pairs.push({ user: pendingUser, assistant: null });
-
-            // Newest first
             return pairs.reverse();
           })().map((pair, pairIdx) => (
-            <div key={pairIdx} className="p-4 rounded-2xl bg-white/90 border border-emerald-100 shadow shadow-emerald-100/60 backdrop-blur-md space-y-3">
+            <div
+              key={pairIdx}
+              className="group p-6 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all space-y-6"
+            >
               {pair.user && (
-                <div>
-                  <div className="text-xs font-medium text-emerald-700 mb-1">你</div>
-                  <div className="text-sm text-emerald-950 whitespace-pre-wrap">{pair.user.content}</div>
-                  <div className="text-xs text-emerald-600 mt-1">{new Date(pair.user.created_at).toLocaleString()}</div>
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase">You</div>
+                  <div className="flex-1">
+                    <div className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{pair.user.content}</div>
+                    <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.user.created_at).toLocaleTimeString()}</div>
+                  </div>
                 </div>
               )}
               {pair.assistant && (
-                <div className="pt-3 border-t border-emerald-100">
-                  <div className="text-xs font-medium text-emerald-700 mb-1">AI</div>
-                  <div className="text-sm text-emerald-950 whitespace-pre-wrap">{pair.assistant.content}</div>
-                  <div className="text-xs text-emerald-600 mt-1">{new Date(pair.assistant.created_at).toLocaleString()}</div>
-                  {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {pair.assistant.audio_records.map((audio: any) => (
-                        <div key={audio.id} className="flex items-center gap-2 text-xs">
-                          <span className="text-emerald-700">{audio.type === 'tts' ? '🔊 TTS' : '🎤 录音'}</span>
-                          <audio controls src={audio.url} className="h-8 flex-1" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className={`flex gap-4 ${pair.user ? 'pt-6 border-t border-slate-50' : ''}`}>
+                  <div className="w-8 h-8 rounded-full bg-orange-50 flex-shrink-0 flex items-center justify-center text-orange-400"><Sparkles className="w-4 h-4" /></div>
+                  <div className="flex-1">
+                    <div className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{pair.assistant.content}</div>
+                    <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.assistant.created_at).toLocaleTimeString()}</div>
+                    {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        {pair.assistant.audio_records.map((audio: any) => (
+                          <div key={audio.id} className="flex flex-col gap-1">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{audio.type === 'tts' ? 'Voice Response' : 'Recording'}</span>
+                            <audio controls src={audio.url} className="h-8 w-full max-w-sm rounded-lg" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           ))}
           {!loading && !error && messages.length === 0 && (
-            <p className="text-sm text-emerald-700 p-4 rounded-2xl bg-white/70 border border-emerald-100">暂无消息</p>
+            <div className="py-20 text-center">
+              <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">No messages in this conversation.</p>
+            </div>
           )}
         </div>
       </div>

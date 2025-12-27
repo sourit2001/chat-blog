@@ -36,56 +36,93 @@ export async function POST(req: Request) {
     let inlineUserProfile = '';
     let inlineSelectedRoles = '';
     const coreMessages = messages.map((msg: any) => {
-      if (msg.parts && Array.isArray(msg.parts)) {
-        // Extract text from parts array
-        const content = msg.parts
+      let contentParts: any[] = [];
+      let inlineUserProfileLocal = '';
+      let inlineSelectedRolesLocal = '';
+
+      const processText = (text: string) => {
+        let cleaned = text;
+        let m: RegExpExecArray | null;
+        PERSONA_BLOCK_REGEX.lastIndex = 0;
+        while ((m = PERSONA_BLOCK_REGEX.exec(text)) !== null) {
+          const persona = (m[1] || '').trim();
+          if (persona) inlineUserProfileLocal = persona;
+        }
+        ROLES_BLOCK_REGEX.lastIndex = 0;
+        while ((m = ROLES_BLOCK_REGEX.exec(text)) !== null) {
+          const roles = (m[1] || '').trim();
+          if (roles) inlineSelectedRolesLocal = roles;
+        }
+        return cleaned.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
+      };
+
+      // 1. Extract text content
+      let textContent = '';
+      if (typeof msg.content === 'string') {
+        textContent = msg.content;
+      } else if (Array.isArray(msg.content)) {
+        textContent = msg.content
           .filter((p: any) => p.type === 'text')
           .map((p: any) => p.text)
           .join('');
-        let cleaned = content;
-        let m: RegExpExecArray | null;
-        PERSONA_BLOCK_REGEX.lastIndex = 0;
-        while ((m = PERSONA_BLOCK_REGEX.exec(content)) !== null) {
-          const persona = (m[1] || '').trim();
-          if (persona) inlineUserProfile = persona;
-        }
-        ROLES_BLOCK_REGEX.lastIndex = 0;
-        while ((m = ROLES_BLOCK_REGEX.exec(content)) !== null) {
-          const roles = (m[1] || '').trim();
-          if (roles) inlineSelectedRoles = roles;
-        }
-        cleaned = cleaned.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
-        return { role: msg.role, content: cleaned };
+      } else if (msg.parts && Array.isArray(msg.parts)) {
+        textContent = msg.parts
+          .filter((p: any) => p.type === 'text')
+          .map((p: any) => p.text)
+          .join('');
       }
-      // If already in core format, return as is
-      if (typeof msg?.content === 'string') {
-        const raw = msg.content as string;
-        let m: RegExpExecArray | null;
-        PERSONA_BLOCK_REGEX.lastIndex = 0;
-        while ((m = PERSONA_BLOCK_REGEX.exec(raw)) !== null) {
-          const persona = (m[1] || '').trim();
-          if (persona) inlineUserProfile = persona;
-        }
-        ROLES_BLOCK_REGEX.lastIndex = 0;
-        while ((m = ROLES_BLOCK_REGEX.exec(raw)) !== null) {
-          const roles = (m[1] || '').trim();
-          if (roles) inlineSelectedRoles = roles;
-        }
-        const cleaned = raw.replace(PERSONA_BLOCK_REGEX, '').replace(ROLES_BLOCK_REGEX, '').trim();
-        return { ...msg, content: cleaned };
+
+      const cleanedText = processText(textContent);
+      if (cleanedText) contentParts.push({ type: 'text', text: cleanedText });
+
+      // Update outer scopes if blocks were found
+      if (inlineUserProfileLocal) inlineUserProfile = inlineUserProfileLocal;
+      if (inlineSelectedRolesLocal) inlineSelectedRoles = inlineSelectedRolesLocal;
+
+      // 2. Extract image parts
+      const extractImages = (parts: any[]) => {
+        parts.forEach((p: any) => {
+          if (p.type === 'image') {
+            contentParts.push(p);
+          } else if (p.image || p.data) {
+            contentParts.push({
+              type: 'image',
+              image: p.image || p.data,
+              contentType: p.contentType
+            });
+          }
+        });
+      };
+
+      if (Array.isArray(msg.content)) extractImages(msg.content);
+      if (msg.parts && Array.isArray(msg.parts)) extractImages(msg.parts);
+
+      // 3. Handle experimental_attachments
+      if (msg.experimental_attachments && Array.isArray(msg.experimental_attachments)) {
+        msg.experimental_attachments.forEach((att: any) => {
+          if (att.contentType?.startsWith('image/') || att.url?.startsWith('data:image/')) {
+            contentParts.push({
+              type: 'image',
+              image: att.url,
+            });
+          }
+        });
       }
-      return msg;
+
+      return {
+        role: msg.role,
+        content: contentParts.length === 1 && contentParts[0].type === 'text' ? contentParts[0].text : contentParts
+      };
     });
 
     console.log("Converted to core messages:", JSON.stringify(coreMessages, null, 2));
 
     // Sanitize / limit history
-    // MBTI mode: keep full history (handled by client), Game mode: keep recent turns to preserve memory
     let sanitizedMessages = coreMessages;
     if (viewMode === 'game') {
-      const MAX_GAME_HISTORY = 24; // keep last ~12 turns (user+assistant)
+      const MAX_GAME_HISTORY = 24;
       sanitizedMessages = coreMessages
-        .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
         .slice(-MAX_GAME_HISTORY);
     }
     // Allowed speaker names (game mode)

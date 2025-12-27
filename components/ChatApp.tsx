@@ -6,7 +6,7 @@ import {
   Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
   Download, Volume2, Loader2, Globe, LayoutGrid, Users, History,
   Settings, ChevronDown, ChevronRight, MessageCircle, PenTool, Palette,
-  UserCircle, Plus, VolumeX
+  UserCircle, Plus, VolumeX, Image as ImageIcon, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
@@ -449,23 +449,22 @@ const getRoleEmoji = (role: string, mode: ViewMode) => {
 };
 
 const getRoleLabel = (role: string, mode: ViewMode) => {
-  if (mode === 'game') {
-    switch (role) {
-      case 'ENTJ':
-        return '祁煜';
-      case 'ISTJ':
-        return '黎深';
-      case 'ENFP':
-        return '沈星回';
-      case 'INFP':
-        return '夏以昼';
-      case 'ENFJ':
-        return '秦彻';
-      default:
-        return '';
-    }
-  }
-  return role;
+  if (mode === 'mbti') return role;
+
+  // For game mode, we might get the MBTI code or the Chinese name
+  const mapping: Record<string, string> = {
+    'ENTJ': '祁煜',
+    'ISTJ': '黎深',
+    'ENFP': '沈星回',
+    'INFP': '夏以昼',
+    'ENFJ': '秦彻',
+    '祁煜': '祁煜',
+    '黎深': '黎深',
+    '沈星回': '沈星回',
+    '夏以昼': '夏以昼',
+    '秦彻': '秦彻'
+  };
+  return mapping[role] || role;
 };
 
 const getRoleAvatar = (role: string, mode: ViewMode) => {
@@ -521,7 +520,7 @@ const getRoleStatusText = (role: string, mode: ViewMode) => {
   }
 };
 
-function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[] }) {
+function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void }) {
   const [visibleCount, setVisibleCount] = useState(0);
 
   // 当消息 ID 变化时，初始化可见计数（避免每次流式内容变化都重置）
@@ -553,10 +552,10 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
     '夏以昼': 'INFP',
     '秦彻': 'ENFJ',
   };
-  const allowedSlots = viewMode === 'game'
-    ? (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0
+  const allowedSlots = (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0)
+    ? (viewMode === 'game'
       ? selectedGameRoles.map((n) => nameToSlot[n]).filter(Boolean)
-      : [])
+      : selectedGameRoles as any)
     : allMbtiRoles;
   const silentRoles = allowedSlots.filter((r) => !spokenRoles.has(r));
 
@@ -629,6 +628,19 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles }: { 
           ))}
         </div>
       )}
+
+      {/* Recall Button for Assistant Message */}
+      {onDelete && (
+        <div className="flex justify-start pl-11">
+          <button
+            onClick={() => onDelete(messageId)}
+            className="flex items-center gap-1 text-[10px] font-bold text-slate-400 opacity-30 hover:opacity-100 hover:text-red-500 transition-all py-1"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>撤回</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -677,8 +689,18 @@ export default function ChatApp() {
     }
   }, [fixedMode]);
   // Game mode: selectable chat members (default all 5)
+  // Mode-based selectable chat members
   const allGameRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] as const;
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([...allGameRoles]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Sync roles when mode changes or if empty
+    if (viewMode === 'game') {
+      setSelectedRoles([...allGameRoles]);
+    } else {
+      setSelectedRoles([...allMbtiRoles]);
+    }
+  }, [viewMode]);
 
   // --- Ambient Sound Engine (Local & Robust) ---
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -881,6 +903,8 @@ export default function ChatApp() {
   const [sttError, setSttError] = useState<string | null>(null);
   const [theme, setTheme] = useState<keyof typeof themes>('amber');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<{ id: string; file: File; preview: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Legacy theme mapping fix
   const activeTheme = selectedTheme;
@@ -1028,6 +1052,21 @@ export default function ChatApp() {
       return filterGameReplyByAllowedRoles(cleaned, snapshot || selectedRoles);
     }
     return cleaned;
+  };
+
+  const getMessageImages = (message: any) => {
+    let images: string[] = [];
+    if (Array.isArray(message.content)) {
+      images = message.content.filter((p: any) => p.type === 'image' || p.image).map((p: any) => p.image || p.data);
+    } else if (message.parts && Array.isArray(message.parts)) {
+      images = message.parts.filter((p: any) => p.type === 'image' || p.image).map((p: any) => p.image || p.data);
+    }
+    const atts = message.experimental_attachments || message.attachments;
+    if (Array.isArray(atts)) {
+      const attImages = atts.filter((a: any) => a.contentType?.startsWith('image/') || a.url?.startsWith('data:image/')).map((a: any) => a.url);
+      images = [...images, ...attImages];
+    }
+    return images.filter(Boolean);
   };
 
   const parseMbtiGroupReply = (content: string) => {
@@ -1182,6 +1221,28 @@ export default function ChatApp() {
     } catch (e) {
       console.warn('saveMessage skipped:', (e as any)?.message);
       return null;
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    try {
+      // 1. Local state update
+      setMessagesActive(prev => prev.filter(m => m.id !== messageId));
+
+      // 2. Clear selected roles cache for this message if it's assistant
+      setMessageSelectedRoles(prev => {
+        const next = { ...prev };
+        delete next[messageId];
+        return next;
+      });
+
+      // 3. Database deletion (best effort)
+      if (supabaseClient) {
+        const client = supabaseClient;
+        await client.from('messages').delete().eq('id', messageId);
+      }
+    } catch (e) {
+      console.warn('deleteMessage failed:', e);
     }
   };
 
@@ -1546,18 +1607,47 @@ export default function ChatApp() {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() && attachedFiles.length === 0) return;
 
     const content = inputValue;
+    const filesSnapshot = [...attachedFiles];
     setInputValue(""); // Clear input immediately
+    setAttachedFiles([]); // Clear attachments
 
     try {
       if (viewMode === 'game') {
         selectedRolesQueueRef.current.push(Array.isArray(selectedRoles) ? [...selectedRoles] : []);
       }
       const contentForModel = withMetaBlocks(content);
-      await sendMessageActive({ role: 'user', content: contentForModel } as any);
-      // store user message
+
+      // Handle multimodal message if files are present
+      if (filesSnapshot.length > 0) {
+        const attachments = await Promise.all(filesSnapshot.map(async (f) => {
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(f.file);
+            reader.onload = () => resolve(reader.result as string);
+          });
+          return {
+            name: f.file.name,
+            contentType: f.file.type,
+            url: base64,
+          };
+        }));
+
+        await sendMessageActive({
+          role: 'user',
+          content: contentForModel,
+          experimental_attachments: attachments as any
+        } as any);
+      } else {
+        await sendMessageActive({
+          role: 'user',
+          content: contentForModel
+        } as any);
+      }
+
+      // store user message (simplified for db, normally might need to store image URLs)
       await saveMessage('user', stripRolesBlock(stripPersonaBlock(content)));
     } catch (err) {
       console.error("Failed to send message:", err);
@@ -1679,6 +1769,46 @@ export default function ChatApp() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files).map(file => ({
+      id: Math.random().toString(36).substring(7),
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+
+    setAttachedFiles(prev => [...prev, ...newFiles]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFile = (id: string) => {
+    setAttachedFiles(prev => {
+      const filtered = prev.filter(f => f.id !== id);
+      const removed = prev.find(f => f.id === id);
+      if (removed) URL.revokeObjectURL(removed.preview);
+      return filtered;
+    });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const newFile = {
+            id: Math.random().toString(36).substring(7),
+            file,
+            preview: URL.createObjectURL(file)
+          };
+          setAttachedFiles(prev => [...prev, newFile]);
+        }
+      }
+    }
+  };
+
   return (
     <div
       className={`relative flex h-[100dvh] w-full overflow-hidden font-sans ${themes[selectedTheme].text}`}
@@ -1751,6 +1881,8 @@ export default function ChatApp() {
               </AnimatePresence>
             </div>
 
+            <div className="h-px bg-[var(--border-light)] my-2 mx-3 opacity-50" />
+
             <Link
               href="/blog"
               onClick={() => setIsMobileSidebarOpen(false)}
@@ -1788,22 +1920,9 @@ export default function ChatApp() {
               onClick={() => setIsPersonaDrawerOpen(true)}
               className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
             >
-              <UserCircle className="w-4 h-4" />
-              <span>人设配置</span>
+              <Users className="w-4 h-4" />
+              <span>群聊人物</span>
             </button>
-
-            <div className="flex items-center justify-between px-3 py-2 text-[13px] text-[var(--text-secondary)]">
-              <div className="flex items-center gap-3">
-                <Mic className="w-4 h-4" />
-                <span>聊天模式</span>
-              </div>
-              <button
-                onClick={() => setInteractionMode(mode => mode === 'text' ? 'voice' : 'text')}
-                className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-hover)] border border-[var(--border-light)]"
-              >
-                {interactionMode === 'voice' ? '语音' : '文字'}
-              </button>
-            </div>
 
             <button
               onClick={() => setIsAppearanceDrawerOpen(true)}
@@ -1908,6 +2027,7 @@ export default function ChatApp() {
 
             {messages.map((m: any) => {
               const content = getMessageContent(m);
+              const images = getMessageImages(m);
               const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
               const hasRoles = parsed && parsed.roles.length > 0;
 
@@ -1917,10 +2037,32 @@ export default function ChatApp() {
                     <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
                       {m.role === 'user' ? <div className="text-[10px] font-black uppercase">You</div> : <Sparkles className="w-4 h-4" />}
                     </div>
-                    <div className={`p-4 max-w-[85%] ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
+                    <div className={`p-4 max-w-[85%] relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
                       <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
                         <ReactMarkdown>{content}</ReactMarkdown>
+                        {images.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {images.map((img, idx) => (
+                              <div key={idx} className="relative group">
+                                <img
+                                  src={img}
+                                  alt="uploaded"
+                                  className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
+
+                      {/* Recall Button */}
+                      <button
+                        onClick={() => deleteMessage(m.id)}
+                        className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>撤回</span>
+                      </button>
                     </div>
                   </div>
                 );
@@ -1933,11 +2075,8 @@ export default function ChatApp() {
                   messageId={m.id}
                   theme={selectedTheme}
                   viewMode={viewMode}
-                  selectedGameRoles={
-                    viewMode === 'game'
-                      ? (messageSelectedRoles[String(m.id ?? '')] || selectedRoles)
-                      : undefined
-                  }
+                  onDelete={deleteMessage}
+                  selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
                 />
               );
             })}
@@ -2000,30 +2139,70 @@ export default function ChatApp() {
 
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <div className={`flex-1 rounded-2xl flex items-center px-4 transition-all focus-within:ring-2 ${themes[selectedTheme].inputBg}`} style={{ '--tw-ring-color': `${themes[selectedTheme].accent}33` } as any}>
-                  <textarea
-                    rows={1}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage(e as any);
-                      }
-                    }}
-                    placeholder={isRecording ? "正在倾听..." : (interactionMode === 'voice' ? "正在语音聊天模式..." : "正在文字聊天模式...")}
-                    className="flex-1 bg-transparent border-none outline-none py-4 max-h-48 resize-none text-[15px] font-medium placeholder-slate-400"
-                  />
+                  <div className="flex flex-col flex-1">
+                    {attachedFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 py-3 border-b border-white/10">
+                        {attachedFiles.map((file) => (
+                          <div key={file.id} className="relative group w-16 h-16">
+                            <img
+                              src={file.preview}
+                              alt="preview"
+                              className="w-full h-full object-cover rounded-xl border border-white/20 shadow-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeFile(file.id)}
+                              className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <textarea
+                      rows={1}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onPaste={handlePaste}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e as any);
+                        }
+                      }}
+                      placeholder={isRecording ? "正在倾听..." : (interactionMode === 'voice' ? "正在语音聊天模式..." : "正在文字聊天模式...")}
+                      className="flex-1 bg-transparent border-none outline-none py-4 max-h-48 resize-none text-[15px] font-medium placeholder-slate-400"
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
-                    <span
-                      className="text-[10px] font-bold px-2 py-1 rounded-md border transition-all"
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 rounded-xl text-slate-400 hover:text-[var(--accent-main)] hover:bg-[var(--bg-hover)] transition-all"
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInteractionMode(m => m === 'voice' ? 'text' : 'voice')}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all hover:scale-105 active:scale-95 shadow-sm`}
                       style={{
                         backgroundColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}15` : '#f1f5f9',
                         color: interactionMode === 'voice' ? themes[selectedTheme].accent : '#64748b',
                         borderColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}33` : '#e2e8f0'
                       } as any}
                     >
-                      {interactionMode === 'voice' ? '语音回复' : '仅文字'}
-                    </span>
+                      {interactionMode === 'voice' ? '语音回复' : '文字回复'}
+                    </button>
                     <button
                       type="button"
                       onClick={toggleRecording}
@@ -2127,8 +2306,8 @@ export default function ChatApp() {
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <UserCircle className="w-6 h-6 text-[var(--accent-main)]" />
-                  <h3 className="text-lg font-black text-slate-800">人设配置</h3>
+                  <Users className="w-6 h-6 text-[var(--accent-main)]" />
+                  <h3 className="text-lg font-black text-slate-800">群聊人物</h3>
                 </div>
                 <button onClick={() => setIsPersonaDrawerOpen(false)} className="p-2 hover:bg-slate-100 text-slate-400 rounded-lg transition-colors">
                   <Plus className="w-5 h-5 rotate-45" />
@@ -2136,6 +2315,37 @@ export default function ChatApp() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Character Selection UI */}
+                {(viewMode === 'game' || viewMode === 'mbti') && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">成员勾选 (最多5人)</label>
+                      <span className="text-[10px] font-bold text-[var(--accent-main)] bg-[var(--accent-main)]/10 px-2 py-0.5 rounded-full">已选 {selectedRoles.length}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(viewMode === 'game' ? allGameRoles : allMbtiRoles).map(r => (
+                        <button
+                          key={r}
+                          onClick={() => {
+                            setSelectedRoles(prev =>
+                              prev.includes(r)
+                                ? (prev.length > 1 ? prev.filter(x => x !== r) : prev)
+                                : [...prev, r].slice(0, 5)
+                            );
+                          }}
+                          className={`flex items-center gap-2 px-3 py-3 rounded-xl text-xs font-bold border transition-all ${selectedRoles.includes(r)
+                            ? 'bg-white border-[var(--accent-main)] text-[var(--accent-main)] shadow-sm'
+                            : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-200'
+                            }`}
+                        >
+                          <div className={`w-1.5 h-1.5 rounded-full ${selectedRoles.includes(r) ? 'bg-[var(--accent-main)]' : 'bg-slate-300'}`} />
+                          <span className="truncate">{getRoleLabel(r, viewMode)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Persona Selector */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
