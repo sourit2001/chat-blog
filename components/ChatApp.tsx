@@ -555,7 +555,23 @@ const getRoleStatusText = (role: string, mode: ViewMode) => {
   }
 };
 
-const getMbtiColor = (role: string) => {
+const gameRoleColors: Record<string, string> = {
+  '沈星回': '#c084fc', // 淡紫色
+  '黎深': '#60a5fa',   // 蓝色
+  '秦彻': '#f87171',   // 红色
+  '祁煜': '#f472b6',   // 粉色
+  '夏以昼': '#fb923c', // 橙色
+};
+
+const getRoleColor = (role: string, mode: ViewMode) => {
+  // 优先匹配游戏角色名，防止 viewMode 状态不一致导致颜色丢失
+  if (gameRoleColors[role]) {
+    return gameRoleColors[role];
+  }
+
+  if (mode === 'game') {
+    return gameRoleColors[role] || '#94a3b8';
+  }
   const group = mbtiGroups.find(g => g.roles.includes(role as any));
   return group?.color || '#94a3b8';
 };
@@ -607,7 +623,7 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
 
       {/* 2. Individual Role Bubbles */}
       {visibleRoles.map((block: any, idx: number) => {
-        const roleColor = viewMode === 'game' ? themes[theme].accent : getMbtiColor(block.role);
+        const roleColor = getRoleColor(block.role, viewMode);
         return (
           <motion.div
             initial={{ opacity: 0, x: -10 }}
@@ -617,8 +633,8 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
           >
             {/* Avatar Section */}
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center bg-white shadow-md border-2 overflow-hidden"
-                style={{ borderColor: roleColor }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center bg-white shadow-md overflow-hidden"
+                style={{ border: `2px solid ${roleColor}` }}>
                 {viewMode === 'game' && getRoleAvatar(block.role, viewMode) ? (
                   <img src={getRoleAvatar(block.role, viewMode)!} alt={block.role} className="w-full h-full object-cover" />
                 ) : (
@@ -636,7 +652,14 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
                 <div className="h-[1px] flex-1 bg-gradient-to-r from-slate-200 to-transparent opacity-50" />
               </div>
 
-              <div className={`p-4 rounded-2xl ${themes[theme].cardBg} shadow-sm border border-black/5 relative overflow-hidden`}>
+              <div
+                className={`p-4 rounded-2xl shadow-sm relative overflow-hidden backdrop-blur-sm transition-colors`}
+                style={{
+                  backgroundColor: `${roleColor}08`, // 还原为极淡背景 (~3%)
+                  borderColor: `${roleColor}15`,     // 还原为淡边框
+                  borderWidth: '1px'
+                }}
+              >
                 {/* Accent line on the left inside the bubble */}
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: roleColor }} />
                 <div className="text-[14.5px] prose prose-sm max-w-none leading-relaxed text-slate-800 font-medium">
@@ -1153,7 +1176,8 @@ export default function ChatApp() {
           introLines = buffer.slice();
         }
         const tag = match[1].toUpperCase();
-        const mapped = (nameToSlot as any)[tag] || tag;
+        // 如果是 Game 模式，保留中文名不映射回 MBTI；否则尝试映射
+        const mapped = viewMode === 'game' ? tag : ((nameToSlot as any)[tag] || tag);
         currentRole = mapped as Role;
         buffer = [line.replace(roleRegex, '').trim()];
       } else if (summaryMatch) {
@@ -2106,19 +2130,16 @@ export default function ChatApp() {
                 {selectedRoles.length > 0 ? (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {selectedRoles.slice(0, 5).map((role, idx) => {
-                      const group = viewMode === 'mbti' ? mbtiGroups.find(g => g.roles.includes(role as any)) : null;
-                      const color = group?.color || '#475569';
-                      const bgColor = group ? `${group.color}15` : '#f1f5f9';
-                      const borderColor = group ? `${group.color}30` : '#e2e8f0';
+                      const baseColor = getRoleColor(role, viewMode);
 
                       return (
                         <div
                           key={role}
                           className="px-2 py-0.5 rounded-md text-[11px] font-bold border shadow-sm whitespace-nowrap flex items-center gap-1.5 transition-colors"
                           style={{
-                            backgroundColor: bgColor,
-                            borderColor: borderColor,
-                            color: color
+                            backgroundColor: `${baseColor}15`,
+                            borderColor: `${baseColor}30`,
+                            color: baseColor
                           }}
                         >
                           {viewMode === 'game' && getRoleAvatar(role, viewMode) ? (
