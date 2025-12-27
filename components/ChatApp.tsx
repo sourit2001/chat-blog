@@ -6,7 +6,7 @@ import {
   Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
   Download, Volume2, Loader2, Globe, LayoutGrid, Users, History,
   Settings, ChevronDown, ChevronRight, MessageCircle, PenTool, Palette,
-  UserCircle, Plus, VolumeX, Image as ImageIcon, X
+  UserCircle, Plus, VolumeX, Image as ImageIcon, X, Camera
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
@@ -713,6 +713,7 @@ export default function ChatApp() {
   const [selectedTheme, setSelectedTheme] = useState<keyof typeof themes>('amber');
   const [selectedBg, setSelectedBg] = useState(chatBackgrounds[0]);
   const [isChatSubMenuOpen, setIsChatSubMenuOpen] = useState(true);
+  const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
 
   // Sync theme to CSS variables
   useEffect(() => {
@@ -979,6 +980,7 @@ export default function ChatApp() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ id: string; file: File; preview: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Legacy theme mapping fix
   const activeTheme = selectedTheme;
@@ -2109,10 +2111,10 @@ export default function ChatApp() {
         {/* Global Persona Bar (if active) */}
         {(viewMode === 'game' || viewMode === 'mbti') && (
           <div className="px-4 py-2 border-b border-[var(--border-light)] bg-[var(--bg-panel)]/40 backdrop-blur-sm">
-            <div className="max-w-4xl mx-auto flex items-center justify-start gap-4 text-xs">
+            <div className="max-w-4xl mx-auto flex items-center justify-start gap-4 text-xs overflow-x-auto no-scrollbar scroll-smooth">
               <button
                 onClick={() => setIsPersonaDrawerOpen(true)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity whitespace-nowrap"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity whitespace-nowrap flex-shrink-0"
               >
                 <span className="text-[var(--text-tertiary)] text-sm">我的身份：</span>
                 <span className={`font-bold ${userPersona.name ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)] opacity-70'} text-sm`}>
@@ -2120,22 +2122,22 @@ export default function ChatApp() {
                 </span>
               </button>
 
-              <div className="h-4 w-px bg-[var(--border-light)]" />
+              <div className="h-4 w-px bg-[var(--border-light)] flex-shrink-0" />
 
               <button
                 onClick={() => setIsPersonaDrawerOpen(true)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0"
               >
                 <span className="text-[var(--text-tertiary)] text-sm whitespace-nowrap">群聊成员：</span>
                 {selectedRoles.length > 0 ? (
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-nowrap">
                     {selectedRoles.slice(0, 5).map((role, idx) => {
                       const baseColor = getRoleColor(role, viewMode);
 
                       return (
                         <div
                           key={role}
-                          className="px-2 py-0.5 rounded-md text-[11px] font-bold border shadow-sm whitespace-nowrap flex items-center gap-1.5 transition-colors"
+                          className="px-2 py-0.5 rounded-md text-[11px] font-bold border shadow-sm whitespace-nowrap flex items-center gap-1.5 transition-colors flex-shrink-0"
                           style={{
                             backgroundColor: `${baseColor}15`,
                             borderColor: `${baseColor}30`,
@@ -2154,7 +2156,7 @@ export default function ChatApp() {
                       );
                     })}
                     {selectedRoles.length > 5 && (
-                      <div className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400 border border-slate-200">
+                      <div className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400 border border-slate-200 flex-shrink-0">
                         +{selectedRoles.length - 5}
                       </div>
                     )}
@@ -2192,36 +2194,47 @@ export default function ChatApp() {
 
                 if (m.role !== 'assistant' || !hasRoles) {
                   return (
-                    <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                       <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
-                        {m.role === 'user' ? <div className="text-[10px] font-black uppercase">You</div> : <Sparkles className="w-4 h-4" />}
+                        {m.role === 'user' ? (
+                          <div className="text-[10px] font-black uppercase">You</div>
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
                       </div>
-                      <div className={`p-4 max-w-[85%] relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
-                        <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
-                          <ReactMarkdown>{content}</ReactMarkdown>
-                          {images.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-3">
-                              {images.map((img, idx) => (
-                                <div key={idx} className="relative group">
-                                  <img
-                                    src={img}
-                                    alt="uploaded"
-                                    className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                      <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[90%] md:max-w-[85%]`}>
+                        {m.role === 'user' && userPersona.name && (
+                          <span className="text-[10px] text-slate-400 font-bold mb-1 px-1">
+                            {userPersona.name}
+                          </span>
+                        )}
+                        <div className={`p-3 md:p-4 relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
+                          <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
+                            <ReactMarkdown>{content}</ReactMarkdown>
+                            {images.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {images.map((img, idx) => (
+                                  <div key={idx} className="relative group">
+                                    <img
+                                      src={img}
+                                      alt="uploaded"
+                                      className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Recall Button */}
-                        <button
-                          onClick={() => deleteMessage(m.id)}
-                          className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>撤回</span>
-                        </button>
+                          {/* Recall Button */}
+                          <button
+                            onClick={() => deleteMessage(m.id)}
+                            className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>撤回</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2243,7 +2256,7 @@ export default function ChatApp() {
         </div>
 
         {/* --- Input Console --- */}
-        <section className={`p-4 border-t transition-all ${selectedBg.url ? 'bg-white/60 backdrop-blur-xl border-white/20' : 'bg-white border-slate-100'}`}>
+        <section className={`p-2 md:p-4 border-t transition-all ${selectedBg.url ? 'bg-white/60 backdrop-blur-xl border-white/20' : 'bg-white border-slate-100'}`}>
           <div className="max-w-4xl mx-auto">
             {/* Draft Preview Tooltip */}
             <AnimatePresence>
@@ -2296,8 +2309,23 @@ export default function ChatApp() {
                 </div>
               )}
 
+              <div className="flex items-center justify-between px-1">
+                <button
+                  type="button"
+                  onClick={() => setInteractionMode(m => m === 'voice' ? 'text' : 'voice')}
+                  className={`text-[10px] font-bold px-3 py-1.5 rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm flex items-center gap-2`}
+                  style={{
+                    backgroundColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}15` : 'rgba(255,255,255,0.8)',
+                    color: interactionMode === 'voice' ? themes[selectedTheme].accent : '#64748b',
+                    borderColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}33` : '#e2e8f0'
+                  } as any}
+                >
+                  {interactionMode === 'voice' ? <Mic className="w-3 h-3" /> : <MessageCircle className="w-3 h-3" />}
+                  {interactionMode === 'voice' ? '语音回复模式' : '文字回复模式'}
+                </button>
+              </div>
               <form onSubmit={handleSendMessage} className="flex gap-2">
-                <div className={`flex-1 rounded-2xl flex items-center px-4 transition-all focus-within:ring-2 ${themes[selectedTheme].inputBg}`} style={{ '--tw-ring-color': `${themes[selectedTheme].accent}33` } as any}>
+                <div className={`flex-1 rounded-2xl flex items-center px-3 md:px-4 transition-all focus-within:ring-2 ${themes[selectedTheme].inputBg}`} style={{ '--tw-ring-color': `${themes[selectedTheme].accent}33` } as any}>
                   <div className="flex flex-col flex-1">
                     {attachedFiles.length > 0 && (
                       <div className="flex flex-wrap gap-2 py-3 border-b border-white/10">
@@ -2335,6 +2363,7 @@ export default function ChatApp() {
                     />
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Hidden Native Inputs */}
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -2343,25 +2372,60 @@ export default function ChatApp() {
                       multiple
                       className="hidden"
                     />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="p-2 rounded-xl text-slate-400 hover:text-[var(--accent-main)] hover:bg-[var(--bg-hover)] transition-all"
-                    >
-                      <ImageIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInteractionMode(m => m === 'voice' ? 'text' : 'voice')}
-                      className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-all hover:scale-105 active:scale-95 shadow-sm`}
-                      style={{
-                        backgroundColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}15` : '#f1f5f9',
-                        color: interactionMode === 'voice' ? themes[selectedTheme].accent : '#64748b',
-                        borderColor: interactionMode === 'voice' ? `${themes[selectedTheme].accent}33` : '#e2e8f0'
-                      } as any}
-                    >
-                      {interactionMode === 'voice' ? '语音回复' : '文字回复'}
-                    </button>
+                    <input
+                      type="file"
+                      ref={cameraInputRef}
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                    />
+
+                    {/* Combined Image/Camera Menu */}
+                    <div className="relative">
+                      <AnimatePresence>
+                        {isImageMenuOpen && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setIsImageMenuOpen(false)} />
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                              className="absolute bottom-full mb-3 left-0 bg-white/90 backdrop-blur-xl border border-gray-100 shadow-xl rounded-xl p-1.5 flex flex-col gap-1 min-w-[100px] z-40"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  cameraInputRef.current?.click();
+                                  setIsImageMenuOpen(false);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-100/80 text-slate-700 text-xs font-bold transition-colors whitespace-nowrap"
+                              >
+                                <Camera className="w-4 h-4 text-[var(--accent-main)]" /> 拍照
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  fileInputRef.current?.click();
+                                  setIsImageMenuOpen(false);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-100/80 text-slate-700 text-xs font-bold transition-colors whitespace-nowrap"
+                              >
+                                <ImageIcon className="w-4 h-4 text-[var(--accent-main)]" /> 相册
+                              </button>
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                      <button
+                        type="button"
+                        onClick={() => setIsImageMenuOpen(!isImageMenuOpen)}
+                        className={`p-2 rounded-xl transition-all ${isImageMenuOpen ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-slate-400 hover:text-[var(--accent-main)] hover:bg-[var(--bg-hover)]'}`}
+                      >
+                        <ImageIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+
                     <button
                       type="button"
                       onClick={toggleRecording}
@@ -2378,7 +2442,7 @@ export default function ChatApp() {
                 <button
                   type="submit"
                   disabled={!inputValue && !isRecording}
-                  className={`p-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50 ${themes[selectedTheme].button}`}
+                  className={`p-3 md:p-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50 ${themes[selectedTheme].button}`}
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -2406,7 +2470,7 @@ export default function ChatApp() {
                     }
                   }}
                   disabled={!hasMessages || blogLoading}
-                  className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--accent-main)] transition-colors disabled:opacity-30"
+                  className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--accent-main)] brightness-75 hover:opacity-80 transition-opacity disabled:opacity-30"
                 >
                   {blogLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                   <span>生成博客</span>
@@ -2414,7 +2478,7 @@ export default function ChatApp() {
                 <button
                   onClick={() => hasMessages && clearChat()}
                   disabled={!hasMessages}
-                  className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--text-tertiary)] hover:text-red-500 transition-colors disabled:opacity-30"
+                  className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[var(--accent-main)] brightness-75 hover:text-red-500 transition-colors disabled:opacity-30"
                 >
                   <Trash2 className="w-3 h-3" />
                   <span>清除对话</span>
@@ -2424,25 +2488,7 @@ export default function ChatApp() {
           </div>
         </section>
 
-        {/* --- Mobile Tab Bar --- */}
-        <nav className="lg:hidden flex items-center justify-around h-16 border-t border-[var(--border-light)] bg-[var(--bg-panel)] pb-safe">
-          <Link href="/mbti" className={`flex flex-col items-center gap-1 ${pathname === '/mbti' || pathname === '/lysk' ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)]'}`}>
-            <MessageCircle className="w-5 h-5" />
-            <span className="text-[10px] font-bold">群聊</span>
-          </Link>
-          <Link href="/blog" className={`flex flex-col items-center gap-1 ${pathname === '/blog' ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)]'}`}>
-            <LayoutGrid className="w-5 h-5" />
-            <span className="text-[10px] font-bold">广场</span>
-          </Link>
-          <Link href="/blog" className="flex flex-col items-center gap-1 text-[var(--text-tertiary)]">
-            <PenTool className="w-5 h-5" />
-            <span className="text-[10px] font-bold">我的</span>
-          </Link>
-          <button onClick={() => setIsPersonaDrawerOpen(true)} className="flex flex-col items-center gap-1 text-[var(--text-tertiary)]">
-            <Settings className="w-5 h-5" />
-            <span className="text-[10px] font-bold">设置</span>
-          </button>
-        </nav>
+
       </main>
 
       {/* --- Global Persona Drawer --- */}
@@ -2461,7 +2507,7 @@ export default function ChatApp() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-white/95 backdrop-blur-2xl shadow-2xl z-[101] border-l border-slate-200 flex flex-col"
+              className="fixed top-0 right-0 bottom-0 w-full sm:w-96 bg-white/95 backdrop-blur-2xl shadow-2xl z-[101] border-l border-slate-200 flex flex-col"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -2644,29 +2690,7 @@ export default function ChatApp() {
                   </div>
                 </div>
 
-                {viewMode === 'game' && (
-                  <div className="space-y-4 pt-4 border-t border-white/5">
-                    <label className="text-[11px] font-black uppercase tracking-widest text-[#737373]">成员管理 (恋与深空)</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {allGameRoles.map(r => (
-                        <button
-                          key={r}
-                          onClick={() => {
-                            setSelectedRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r].slice(0, 5));
-                          }}
-                          className="px-3 py-2 rounded-xl text-xs font-bold border transition-colors"
-                          style={{
-                            backgroundColor: selectedRoles.includes(r) ? `${themes[selectedTheme].accent}15` : 'rgba(255,255,255,0.05)',
-                            color: selectedRoles.includes(r) ? themes[selectedTheme].accent : '#a3a3a3',
-                            borderColor: selectedRoles.includes(r) ? `${themes[selectedTheme].accent}4d` : 'rgba(255,255,255,0.05)'
-                          } as any}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
 
               <div className="p-6 border-t border-slate-100 space-y-4 bg-white">
@@ -2702,7 +2726,7 @@ export default function ChatApp() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-80 sm:w-96 bg-[var(--bg-page)] shadow-2xl z-[101] border-l border-[var(--border-light)] flex flex-col"
+              className="fixed top-0 right-0 bottom-0 w-full sm:w-96 bg-[var(--bg-page)] shadow-2xl z-[101] border-l border-[var(--border-light)] flex flex-col"
             >
               <div className="p-6 border-b border-[var(--border-light)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
