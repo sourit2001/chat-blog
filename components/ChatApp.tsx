@@ -6,7 +6,7 @@ import {
   Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
   Download, Volume2, Loader2, Globe, LayoutGrid, Users, History,
   Settings, ChevronDown, ChevronRight, MessageCircle, PenTool, Palette,
-  UserCircle, Plus, VolumeX, Image as ImageIcon, X, Camera
+  UserCircle, Plus, VolumeX, Image as ImageIcon, X, Camera, CheckSquare, Square
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
@@ -16,6 +16,7 @@ import { supabaseClient } from "@/lib/supabaseClient";
 import { Logo } from "@/components/Logo";
 import Link from 'next/link';
 import { UserStatus } from '@/components/UserStatus';
+import { prepareMessagesForBlog, restoreBlogImages } from '@/utils/blogUtils';
 
 type ParsedMbtiReply = {
   intro: string;
@@ -714,6 +715,10 @@ export default function ChatApp() {
   const [selectedBg, setSelectedBg] = useState(chatBackgrounds[0]);
   const [isChatSubMenuOpen, setIsChatSubMenuOpen] = useState(true);
   const [isImageMenuOpen, setIsImageMenuOpen] = useState(false);
+  const [blogStyle, setBlogStyle] = useState<'literary' | 'logical' | 'record'>('literary');
+  const [isBlogDraftVisible, setIsBlogDraftVisible] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
 
   // Sync theme to CSS variables
   useEffect(() => {
@@ -1721,9 +1726,10 @@ export default function ChatApp() {
       }
       const contentForModel = withMetaBlocks(content);
 
+      let attachments: any[] = [];
       // Handle multimodal message if files are present
       if (filesSnapshot.length > 0) {
-        const attachments = await Promise.all(filesSnapshot.map(async (f) => {
+        attachments = await Promise.all(filesSnapshot.map(async (f) => {
           const base64 = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.readAsDataURL(f.file);
@@ -1760,8 +1766,12 @@ export default function ChatApp() {
         });
       }
 
-      // store user message (simplified for db, normally might need to store image URLs)
-      await saveMessage('user', stripRolesBlock(stripPersonaBlock(content)));
+      // store user message (append image markdown if attachments exist)
+      let contentToSave = stripRolesBlock(stripPersonaBlock(content));
+      if (attachments.length > 0) {
+        contentToSave += '\n\n' + attachments.map(a => `![image](${a.url})`).join('\n\n');
+      }
+      await saveMessage('user', contentToSave);
     } catch (err) {
       console.error("Failed to send message:", err);
     }
@@ -2194,46 +2204,65 @@ export default function ChatApp() {
 
                 if (m.role !== 'assistant' || !hasRoles) {
                   return (
-                    <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
-                        {m.role === 'user' ? (
-                          <div className="text-[10px] font-black uppercase">You</div>
-                        ) : (
-                          <Sparkles className="w-4 h-4" />
-                        )}
-                      </div>
-                      <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[90%] md:max-w-[85%]`}>
-                        {m.role === 'user' && userPersona.name && (
-                          <span className="text-[10px] text-slate-400 font-bold mb-1 px-1">
-                            {userPersona.name}
-                          </span>
-                        )}
-                        <div className={`p-3 md:p-4 relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
-                          <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
-                            <ReactMarkdown>{content}</ReactMarkdown>
-                            {images.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                {images.map((img, idx) => (
-                                  <div key={idx} className="relative group">
-                                    <img
-                                      src={img}
-                                      alt="uploaded"
-                                      className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                    <div key={m.id} className="flex gap-2 items-start">
+                      {isSelectionMode && (
+                        <button
+                          onClick={() => {
+                            const next = new Set(selectedMessageIds);
+                            if (next.has(m.id)) next.delete(m.id);
+                            else next.add(m.id);
+                            setSelectedMessageIds(next);
+                          }}
+                          className={`mt-3 flex-shrink-0 transition-all ${selectedMessageIds.has(m.id) ? 'text-[var(--accent-main)]' : 'text-slate-300 hover:text-slate-400'}`}
+                        >
+                          {selectedMessageIds.has(m.id) ? (
+                            <CheckSquare className="w-5 h-5" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                      )}
+                      <div className={`flex-1 flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
+                          {m.role === 'user' ? (
+                            <div className="text-[10px] font-black uppercase">You</div>
+                          ) : (
+                            <Sparkles className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[90%] md:max-w-[85%]`}>
+                          {m.role === 'user' && userPersona.name && (
+                            <span className="text-[10px] text-slate-400 font-bold mb-1 px-1">
+                              {userPersona.name}
+                            </span>
+                          )}
+                          <div className={`p-3 md:p-4 relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
+                            <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
+                              <ReactMarkdown>{content}</ReactMarkdown>
+                              {images.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  {images.map((img, idx) => (
+                                    <div key={idx} className="relative group">
+                                      <img
+                                        src={img}
+                                        alt="uploaded"
+                                        className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
 
-                          {/* Recall Button */}
-                          <button
-                            onClick={() => deleteMessage(m.id)}
-                            className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>撤回</span>
-                          </button>
+                            {/* Recall Button */}
+                            <button
+                              onClick={() => deleteMessage(m.id)}
+                              className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>撤回</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2241,15 +2270,35 @@ export default function ChatApp() {
                 }
 
                 return (
-                  <MbtiReply
-                    key={m.id}
-                    parsed={parsed!}
-                    messageId={m.id}
-                    theme={selectedTheme}
-                    viewMode={viewMode}
-                    onDelete={deleteMessage}
-                    selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
-                  />
+                  <div key={m.id} className="flex gap-2 items-start">
+                    {isSelectionMode && (
+                      <button
+                        onClick={() => {
+                          const next = new Set(selectedMessageIds);
+                          if (next.has(m.id)) next.delete(m.id);
+                          else next.add(m.id);
+                          setSelectedMessageIds(next);
+                        }}
+                        className={`mt-3 flex-shrink-0 transition-all ${selectedMessageIds.has(m.id) ? 'text-[var(--accent-main)]' : 'text-slate-300 hover:text-slate-400'}`}
+                      >
+                        {selectedMessageIds.has(m.id) ? (
+                          <CheckSquare className="w-5 h-5" />
+                        ) : (
+                          <Square className="w-5 h-5" />
+                        )}
+                      </button>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <MbtiReply
+                        parsed={parsed!}
+                        messageId={m.id}
+                        theme={selectedTheme}
+                        viewMode={viewMode}
+                        onDelete={deleteMessage}
+                        selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
+                      />
+                    </div>
+                  </div>
                 );
               })}
           </div>
@@ -2450,19 +2499,68 @@ export default function ChatApp() {
 
               {/* Input Tools */}
               <div className="flex items-center gap-4 px-2">
+                <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100/50 border border-slate-200/50">
+                  <button
+                    onClick={() => setIsSelectionMode(!isSelectionMode)}
+                    className={`p-1 rounded transition-colors ${isSelectionMode ? 'text-[var(--accent-main)] bg-white shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+                    title="选择消息生成"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="w-px h-3 bg-slate-200 mx-0.5" />
+                  <Palette className="w-3 h-3 text-slate-400 ml-1" />
+                  <select
+                    value={blogStyle}
+                    onChange={(e) => setBlogStyle(e.target.value as any)}
+                    className="bg-transparent text-[11px] font-bold text-slate-500 outline-none border-none py-0.5 pl-1 pr-6 cursor-pointer appearance-none"
+                    style={{ backgroundImage: 'none' }}
+                  >
+                    <option value="literary">文艺风格</option>
+                    <option value="logical">逻辑严密</option>
+                    <option value="record">对话实录</option>
+                  </select>
+                  <ChevronDown className="w-2.5 h-2.5 text-slate-400 -ml-5 pointer-events-none" />
+                </div>
                 <button
                   onClick={async () => {
                     if (!hasMessages) return;
                     try {
                       setBlogLoading(true);
+                      const targetMessages = (isSelectionMode && selectedMessageIds.size > 0)
+                        ? messages.filter((m: any) => selectedMessageIds.has(m.id))
+                        : messages;
+
+                      // 1. Pre-process messages to strip large images client-side
+                      const { cleanedMessages, imageMap } = prepareMessagesForBlog(targetMessages);
+
+                      const globalNick = typeof window !== 'undefined' ? localStorage.getItem('user_global_nickname') : '';
+                      const authorName = globalNick || userPersona.name || '笔者';
+
                       const res = await fetch('/api/blog', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ messages }),
+                        body: JSON.stringify({
+                          messages: cleanedMessages, // Send cleaned messages
+                          style: blogStyle,
+                          authorName
+                        }),
                       });
+
+                      if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.error || 'Failed to generate blog');
+                      }
+
                       const data = await res.json();
-                      if (!res.ok) throw new Error(data.error || 'Failed to generate blog');
-                      setBlogDraft({ title: data.title, markdown: data.markdown });
+
+                      // 2. Restore images client-side
+                      const restoredMarkdown = restoreBlogImages(data.markdown, imageMap);
+
+                      setBlogDraft({
+                        title: data.title,
+                        markdown: restoredMarkdown
+                      });
+                      setIsBlogDraftVisible(true);
                     } catch (e) {
                       alert('生成博客失败，请重试');
                     } finally {

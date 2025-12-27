@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Globe, Check, Edit3, Eye, Feather, Share2 } from 'lucide-react';
+import { ArrowLeft, Globe, Check, Edit3, Eye, Feather, Share2, Save, Lock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Logo } from "@/components/Logo";
 
@@ -14,11 +14,23 @@ export default function PublishPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [isPublished, setIsPublished] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [isPrivate, setIsPrivate] = useState(false);
+
+    const [editId, setEditId] = useState<string | null>(null);
+
+    const [authorName, setAuthorName] = useState('AI 创作者');
 
     useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const nick = localStorage.getItem('user_global_nickname');
+            if (nick) setAuthorName(nick);
+        }
+
         const savedDraft = localStorage.getItem('chat2blog_draft');
         if (savedDraft) {
-            const { title, content } = JSON.parse(savedDraft);
+            const { title, content, isPrivate: savedPrivate, id } = JSON.parse(savedDraft);
             const cleanTitle = (title || '').replace(/^#\s+/, '').trim();
             setBlogTitle(cleanTitle);
 
@@ -27,8 +39,28 @@ export default function PublishPage() {
                 cleanContent = cleanContent.replace(`# ${cleanTitle}`, '').trim();
             }
             setBlogContent(cleanContent);
+            if (savedPrivate !== undefined) setIsPrivate(savedPrivate);
+            if (id) setEditId(id);
         }
     }, []);
+
+    const handleSaveDraft = () => {
+        setIsSaving(true);
+        // Save logic
+        const draftData = {
+            id: editId,
+            title: blogTitle,
+            content: blogContent,
+            date: new Date().toISOString(), // Update timestamp
+            isPrivate
+        };
+        localStorage.setItem('chat2blog_draft', JSON.stringify(draftData));
+
+        setTimeout(() => {
+            setIsSaving(false);
+            setLastSaved(new Date());
+        }, 800);
+    };
 
     const handlePublish = async () => {
         setIsPublishing(true);
@@ -36,15 +68,55 @@ export default function PublishPage() {
             setIsPublishing(false);
             setIsPublished(true);
             const publishedPosts = JSON.parse(localStorage.getItem('chat2blog_published') || '[]');
-            publishedPosts.unshift({
-                id: Date.now().toString(),
-                title: blogTitle,
-                content: blogContent,
-                date: new Date().toISOString()
-            });
-            localStorage.setItem('chat2blog_published', JSON.stringify(publishedPosts));
+
+            let isUpdated = false;
+            let updatedPosts = publishedPosts;
+
+            if (editId) {
+                const index = publishedPosts.findIndex((p: any) => p.id === editId);
+                if (index !== -1) {
+                    updatedPosts = publishedPosts.map((p: any) => {
+                        if (p.id === editId) {
+                            return {
+                                ...p,
+                                title: blogTitle,
+                                content: blogContent,
+                                date: new Date().toISOString(),
+                                isPrivate
+                            };
+                        }
+                        return p;
+                    });
+                    isUpdated = true;
+                }
+            }
+
+            if (!isUpdated) {
+                updatedPosts.unshift({
+                    id: Date.now().toString(),
+                    title: blogTitle,
+                    content: blogContent,
+                    author: authorName,
+                    date: new Date().toISOString(),
+                    isPrivate
+                });
+            }
+
+            localStorage.setItem('chat2blog_published', JSON.stringify(updatedPosts));
+            localStorage.removeItem('chat2blog_draft');
         }, 1500);
     };
+
+    const { cleanContent, coverImage } = React.useMemo(() => {
+        const imgMatch = blogContent.match(/!\[.*?\]\((.*?)\)/);
+        if (imgMatch) {
+            return {
+                cleanContent: blogContent.replace(imgMatch[0], ''),
+                coverImage: imgMatch[1]
+            };
+        }
+        return { cleanContent: blogContent, coverImage: null };
+    }, [blogContent]);
 
     return (
         <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10">
@@ -61,7 +133,28 @@ export default function PublishPage() {
                     <Logo className="w-8 h-8 opacity-90" showText={true} />
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
+                    <button
+                        onClick={() => setIsPrivate(!isPrivate)}
+                        className={`flex items-center gap-2 p-2 md:px-5 md:py-2.5 text-sm font-medium rounded-full transition-all ${isPrivate
+                            ? 'bg-slate-100 text-slate-600'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
+                        title={isPrivate ? '仅自己可见' : '公开可见'}
+                    >
+                        {isPrivate ? <Lock className="w-5 h-5 md:w-4 md:h-4" /> : <Globe className="w-5 h-5 md:w-4 md:h-4" />}
+                        <span className="hidden md:inline">{isPrivate ? '仅自己可见' : '公开可见'}</span>
+                    </button>
+
+                    <button
+                        onClick={handleSaveDraft}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 p-2 md:px-5 md:py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-full transition-all"
+                        title="保存草稿"
+                    >
+                        {isSaving ? <Check className="w-5 h-5 md:w-4 md:h-4" /> : <Save className="w-5 h-5 md:w-4 md:h-4" />}
+                        <span className="hidden md:inline">{isSaving ? '已保存' : '存草稿'}</span>
+                    </button>
+
                     <button
                         onClick={() => setIsEditing(!isEditing)}
                         className="hidden md:flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-full transition-all"
@@ -73,7 +166,7 @@ export default function PublishPage() {
                     <button
                         onClick={handlePublish}
                         disabled={isPublishing || isPublished}
-                        className={`flex items-center gap-3 px-8 py-2.5 text-sm font-bold rounded-full transition-all tracking-widest ${isPublished
+                        className={`flex items-center gap-2 md:gap-3 px-4 md:px-8 py-2.5 text-sm font-bold rounded-full transition-all tracking-widest ${isPublished
                             ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)] cursor-default border border-[var(--accent-main)]/20'
                             : 'bg-[var(--accent-main)] text-white hover:opacity-90 active:scale-95'
                             }`}
@@ -85,12 +178,13 @@ export default function PublishPage() {
                         ) : (
                             <Feather className="w-4 h-4" />
                         )}
-                        {isPublishing ? '载入星辰...' : isPublished ? '已见刊' : '付梓开启'}
+                        <span className="hidden md:inline">{isPublishing ? '载入星辰...' : isPublished ? '已见刊' : '付梓开启'}</span>
+                        <span className="md:hidden">{isPublishing ? '发布...' : isPublished ? '已发' : '发布'}</span>
                     </button>
                 </div>
             </header>
 
-            <main className="pt-24 pb-12 px-6 max-w-3xl mx-auto">
+            <main className="pt-24 pb-12 px-6 max-w-4xl mx-auto">
                 {isPublished && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -132,30 +226,54 @@ export default function PublishPage() {
                         </div>
                     ) : (
                         <article className="artistic-prose">
-                            <header className="mb-12 text-center">
+                            <header className="mb-12">
                                 <motion.div
                                     initial={{ opacity: 0, y: 15 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.6 }}
+                                    className={`flex flex-col md:flex-row gap-8 md:gap-12 items-center ${coverImage ? 'text-left' : 'text-center'}`}
                                 >
-                                    <div className="flex items-center justify-center gap-3 mb-6 opacity-30">
-                                        <div className="h-px w-8 bg-[var(--accent-main)]" />
-                                        <Feather className="w-4 h-4 text-[var(--accent-main)]" />
-                                        <div className="h-px w-8 bg-[var(--accent-main)]" />
-                                    </div>
-                                    <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-[var(--text-primary)] mb-6 leading-tight">
-                                        {blogTitle || '无题'}
-                                    </h1>
-                                    <div className="flex items-center justify-center gap-4 text-sm font-medium text-[var(--text-tertiary)] tracking-widest uppercase">
-                                        <span>文 / AI 创作者</span>
-                                        <span className="text-[var(--border-light)]">•</span>
-                                        <span>{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' })}</span>
+                                    {coverImage && (
+                                        <div className="w-full md:w-[280px] flex-shrink-0">
+                                            <img
+                                                src={coverImage}
+                                                alt="Cover"
+                                                className="w-full aspect-[3/4] object-cover rounded-2xl shadow-xl rotate-2 hover:rotate-0 transition-transform duration-500 border border-[var(--border-light)]"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="flex-1 w-full">
+                                        <div className={`flex items-center gap-3 mb-6 opacity-30 ${coverImage ? 'justify-start' : 'justify-center'}`}>
+                                            <div className="h-px w-8 bg-[var(--accent-main)]" />
+                                            <Feather className="w-4 h-4 text-[var(--accent-main)]" />
+                                            <div className="h-px w-8 bg-[var(--accent-main)]" />
+                                        </div>
+                                        <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-[var(--text-primary)] mb-6 leading-tight">
+                                            {blogTitle || '无题'}
+                                        </h1>
+                                        <div className={`flex items-center gap-4 text-sm font-medium text-[var(--text-tertiary)] tracking-widest uppercase ${coverImage ? 'justify-start' : 'justify-center'}`}>
+                                            <span>文 / {authorName}</span>
+                                            <span className="text-[var(--border-light)]">•</span>
+                                            <span>{new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' })}</span>
+                                        </div>
                                     </div>
                                 </motion.div>
                             </header>
 
                             <div className="markdown-content artistic-prose">
-                                <ReactMarkdown>{blogContent}</ReactMarkdown>
+                                <ReactMarkdown
+                                    urlTransform={(url) => url}
+                                    components={{
+                                        img: ({ node, ...props }) => (
+                                            <img
+                                                {...props}
+                                                className="max-w-full md:max-w-[300px] max-h-[300px] rounded-xl border border-[var(--border-light)] shadow-md object-cover my-6 mx-auto block"
+                                            />
+                                        )
+                                    }}
+                                >
+                                    {cleanContent}
+                                </ReactMarkdown>
                             </div>
 
                             <footer className="mt-20 pt-12 border-t border-[var(--border-light)] text-center">

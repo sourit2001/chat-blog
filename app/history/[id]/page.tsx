@@ -15,9 +15,17 @@ import {
   History,
   Heart,
   Menu,
-  X
+  X,
+  CheckSquare,
+  Square,
+  FileText,
+  Trash2,
+  Globe,
+  Palette
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "framer-motion";
+import { prepareMessagesForBlog, restoreBlogImages } from '@/utils/blogUtils';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +42,22 @@ export default function ConversationDetailPage() {
   const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(false);
   const [isCommunityDropdownOpen, setIsCommunityDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Blog Generation State
+  const [blogStyle, setBlogStyle] = useState<'literary' | 'logical' | 'record'>('literary');
+  const [blogDraft, setBlogDraft] = useState<{ title: string; markdown: string } | null>(null);
+  const [isBlogDraftVisible, setIsBlogDraftVisible] = useState(false);
+  const [blogLoading, setBlogLoading] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [nickname, setNickname] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('user_global_nickname');
+      if (stored) setNickname(stored);
+    }
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -309,38 +333,105 @@ export default function ConversationDetailPage() {
             if (pendingUser) pairs.push({ user: pendingUser, assistant: null });
             return pairs.reverse();
           })().map((pair, pairIdx) => (
-            <div
-              key={pairIdx}
-              className="group p-6 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all space-y-6"
-            >
-              {pair.user && (
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase">You</div>
-                  <div className="flex-1">
-                    <div className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{pair.user.content}</div>
-                    <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.user.created_at).toLocaleTimeString()}</div>
-                  </div>
-                </div>
+            <div key={pairIdx} className="flex gap-3 items-start">
+              {isSelectionMode && (
+                <button
+                  onClick={() => {
+                    const ids = [pair.user?.id, pair.assistant?.id].filter(Boolean) as string[];
+                    const next = new Set(selectedMessageIds);
+                    // If both exist and are selected, deselect both. If one missing or unselected, select available ones.
+                    // Simple logic: toggle group.
+                    const allSelected = ids.every(id => next.has(id));
+                    if (allSelected) {
+                      ids.forEach(id => next.delete(id));
+                    } else {
+                      ids.forEach(id => next.add(id));
+                    }
+                    setSelectedMessageIds(next);
+                  }}
+                  className={`mt-6 flex-shrink-0 transition-all ${[pair.user?.id, pair.assistant?.id].filter(Boolean).every(id => selectedMessageIds.has(id as string)) ? 'text-[var(--accent-main)]' : 'text-slate-300 hover:text-slate-400'}`}
+                >
+                  {[pair.user?.id, pair.assistant?.id].filter(Boolean).every(id => selectedMessageIds.has(id as string)) ? (
+                    <CheckSquare className="w-5 h-5" />
+                  ) : (
+                    <Square className="w-5 h-5" />
+                  )}
+                </button>
               )}
-              {pair.assistant && (
-                <div className={`flex gap-4 ${pair.user ? 'pt-6 border-t border-slate-50' : ''}`}>
-                  <div className="w-8 h-8 rounded-full bg-orange-50 flex-shrink-0 flex items-center justify-center text-orange-400"><Sparkles className="w-4 h-4" /></div>
-                  <div className="flex-1">
-                    <div className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{pair.assistant.content}</div>
-                    <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.assistant.created_at).toLocaleTimeString()}</div>
-                    {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
-                      <div className="mt-4 space-y-3">
-                        {pair.assistant.audio_records.map((audio: any) => (
-                          <div key={audio.id} className="flex flex-col gap-1">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{audio.type === 'tts' ? 'Voice Response' : 'Recording'}</span>
-                            <audio controls src={audio.url} className="h-8 w-full max-w-sm rounded-lg" />
-                          </div>
-                        ))}
+
+              <div
+                className={`flex-1 group p-6 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all space-y-6 ${isSelectionMode ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    const ids = [pair.user?.id, pair.assistant?.id].filter(Boolean) as string[];
+                    const next = new Set(selectedMessageIds);
+                    const allSelected = ids.every(id => next.has(id));
+                    if (allSelected) {
+                      ids.forEach(id => next.delete(id));
+                    } else {
+                      ids.forEach(id => next.add(id));
+                    }
+                    setSelectedMessageIds(next);
+                  }
+                }}
+              >
+                {pair.user && (
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase">You</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-800 font-medium leading-relaxed prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          urlTransform={(url) => url}
+                          components={{
+                            img: ({ node, ...props }) => (
+                              <img
+                                {...props}
+                                className="max-w-[200px] max-h-[200px] rounded-lg border border-slate-200 shadow-sm object-cover my-2 inline-block"
+                              />
+                            )
+                          }}
+                        >
+                          {pair.user.content}
+                        </ReactMarkdown>
                       </div>
-                    )}
+                      <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.user.created_at).toLocaleTimeString()}</div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                {pair.assistant && (
+                  <div className={`flex gap-4 ${pair.user ? 'pt-6 border-t border-slate-50' : ''}`}>
+                    <div className="w-8 h-8 rounded-full bg-orange-50 flex-shrink-0 flex items-center justify-center text-orange-400"><Sparkles className="w-4 h-4" /></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-slate-800 font-medium leading-relaxed prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          urlTransform={(url) => url}
+                          components={{
+                            img: ({ node, ...props }) => (
+                              <img
+                                {...props}
+                                className="max-w-[200px] max-h-[200px] rounded-lg border border-slate-200 shadow-sm object-cover my-2 inline-block"
+                              />
+                            )
+                          }}
+                        >
+                          {pair.assistant.content}
+                        </ReactMarkdown>
+                      </div>
+                      <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.assistant.created_at).toLocaleTimeString()}</div>
+                      {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
+                        <div className="mt-4 space-y-3">
+                          {pair.assistant.audio_records.map((audio: any) => (
+                            <div key={audio.id} className="flex flex-col gap-1">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{audio.type === 'tts' ? 'Voice Response' : 'Recording'}</span>
+                              <audio controls src={audio.url} className="h-8 w-full max-w-sm rounded-lg" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
           {!loading && !error && messages.length === 0 && (
@@ -350,6 +441,123 @@ export default function ConversationDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Blog Generation Toolbar */}
+      {!loading && !error && messages.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-slate-200 z-40">
+          <div className="max-w-3xl mx-auto flex flex-col gap-4">
+            {/* Draft Preview */}
+            <AnimatePresence>
+              {blogDraft && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="p-4 rounded-2xl border border-slate-200 shadow-2xl flex items-center justify-between bg-white overflow-hidden"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="p-3 rounded-xl bg-orange-100 text-orange-500 flex-shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs text-slate-400 uppercase font-bold tracking-widest">博客草稿已就绪</div>
+                      <div className="text-sm text-slate-800 font-bold truncate">{blogDraft.title}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button onClick={() => setBlogDraft(null)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('chat2blog_draft', JSON.stringify({ title: blogDraft.title, content: blogDraft.markdown }));
+                        router.push('/publish');
+                      }}
+                      className="px-4 py-2 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 bg-orange-500 hover:bg-orange-600"
+                    >
+                      <Globe className="w-4 h-4" /> 立即发布
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex items-center justify-between gap-4">
+              <button
+                onClick={() => setIsSelectionMode(!isSelectionMode)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all ${isSelectionMode ? 'bg-orange-50 text-orange-600 border border-orange-200' : 'bg-slate-100 text-slate-500 border border-transparent hover:bg-slate-200'}`}
+              >
+                {isSelectionMode ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                <span>{isSelectionMode ? '退出选择' : '选择消息'}</span>
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl">
+                  <Palette className="w-4 h-4 text-slate-400" />
+                  <select
+                    value={blogStyle}
+                    onChange={(e) => setBlogStyle(e.target.value as any)}
+                    className="bg-transparent text-sm font-bold text-slate-600 outline-none border-none cursor-pointer appearance-none pr-4"
+                  >
+                    <option value="literary">文艺风格</option>
+                    <option value="logical">逻辑严密</option>
+                    <option value="record">对话实录</option>
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-slate-400 -ml-2 pointer-events-none" />
+                </div>
+
+                <button
+                  disabled={blogLoading}
+                  onClick={async () => {
+                    try {
+                      setBlogLoading(true);
+                      const targetMessages = (isSelectionMode && selectedMessageIds.size > 0)
+                        ? messages.filter((m: any) => selectedMessageIds.has(m.id))
+                        : messages;
+
+                      const { cleanedMessages, imageMap } = prepareMessagesForBlog(targetMessages);
+
+                      const globalNick = localStorage.getItem('user_global_nickname');
+                      const authorName = globalNick || nickname || '笔者';
+
+                      const res = await fetch('/api/blog', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          messages: cleanedMessages,
+                          style: blogStyle,
+                          authorName
+                        }),
+                      });
+
+                      if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.error || 'Failed to generate blog');
+                      }
+
+                      const data = await res.json();
+                      const restoredMarkdown = restoreBlogImages(data.markdown, imageMap);
+
+                      setBlogDraft({
+                        title: data.title,
+                        markdown: restoredMarkdown
+                      });
+                      setIsBlogDraftVisible(true);
+                    } catch (e: any) {
+                      alert('生成失败: ' + e.message);
+                    } finally {
+                      setBlogLoading(false);
+                    }
+                  }}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-white transition-all shadow-lg shadow-orange-200 ${blogLoading ? 'bg-slate-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
+                >
+                  {blogLoading ? '生成中...' : '生成博客'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

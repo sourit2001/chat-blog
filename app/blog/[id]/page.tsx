@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Share2, Feather, Clock, Heart, MessageSquare, Send } from 'lucide-react';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Share2, Feather, Clock, Heart, MessageSquare, Send, ChevronDown, Users, Sparkles, BookOpen, History, Menu, X, Edit3 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Logo } from "@/components/Logo";
 import { UserStatus } from '@/components/UserStatus';
@@ -13,6 +14,7 @@ type BlogPost = {
     title: string;
     content: string;
     date: string;
+    isPrivate?: boolean;
 };
 
 export default function BlogDetailPage() {
@@ -27,6 +29,11 @@ export default function BlogDetailPage() {
     const [comments, setComments] = useState<Array<{ id: string, text: string, date: string, author: string }>>([]);
     const [newComment, setNewComment] = useState('');
     const [isCopied, setIsCopied] = useState(false);
+
+    // Navigation states
+    const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(false);
+    const [isCommunityDropdownOpen, setIsCommunityDropdownOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         const saved = localStorage.getItem('chat2blog_published');
@@ -64,6 +71,19 @@ export default function BlogDetailPage() {
         setLikes(newLikes);
         localStorage.setItem(`likes_${postId}`, newLikes.toString());
         localStorage.setItem(`isLiked_${postId}`, newIsLiked.toString());
+    };
+    const handleEdit = () => {
+        if (!post) return;
+        const draftData = {
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            date: new Date().toISOString(),
+            isPrivate: post.isPrivate,
+            isTip: true // Flag to tell publish page this is an edit of existing
+        };
+        localStorage.setItem('chat2blog_draft', JSON.stringify(draftData));
+        router.push('/publish');
     };
 
     const handleShare = async () => {
@@ -104,69 +124,265 @@ export default function BlogDetailPage() {
         setNewComment('');
     };
 
+    const { cleanContent, coverImage } = React.useMemo(() => {
+        if (!post) return { cleanContent: '', coverImage: null };
+        const imgMatch = post.content.match(/!\[.*?\]\((.*?)\)/);
+        if (imgMatch) {
+            return {
+                cleanContent: post.content.replace(imgMatch[0], ''),
+                coverImage: imgMatch[1]
+            };
+        }
+        return { cleanContent: post.content, coverImage: null };
+    }, [post]);
+
     if (!post) return null;
 
     return (
         <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-serif selection:bg-[var(--accent-main)]/10">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 h-20 bg-[var(--bg-page)]/80 backdrop-blur-xl border-b border-[var(--border-light)] z-50 px-6 md:px-12 flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                    <button
-                        onClick={() => router.back()}
-                        className="p-3 hover:bg-[var(--bg-hover)] rounded-full transition-all group"
-                    >
-                        <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
-                    </button>
-                    <div className="h-6 w-px bg-[var(--border-light)]" />
-                    <Logo className="w-8 h-8 opacity-90" showText={true} />
+            {/* Navigation */}
+            <nav className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-[var(--bg-page)]/80 backdrop-blur-xl border-b border-[var(--border-light)]">
+                <div className="flex items-center gap-10">
+                    <div className="flex items-center gap-6">
+                        <button
+                            onClick={() => router.back()}
+                            className="p-2 -ml-2 hover:bg-[var(--bg-hover)] rounded-xl transition-all group"
+                        >
+                            <ArrowLeft className="w-5 h-5 text-[var(--text-secondary)]" />
+                        </button>
+                        <div className="h-6 w-px bg-[var(--border-light)]" />
+                        <Link href="/">
+                            <Logo className="w-8 h-8 md:w-9 md:h-9" showText={true} accentColor="var(--accent-main)" />
+                        </Link>
+                    </div>
+
+                    <div className="hidden lg:flex items-center gap-8">
+                        <div
+                            className="relative"
+                            onMouseEnter={() => setIsChatDropdownOpen(true)}
+                            onMouseLeave={() => setIsChatDropdownOpen(false)}
+                        >
+                            <button className="flex items-center gap-1 text-[13px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-8 uppercase tracking-widest">
+                                群聊 <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isChatDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            <AnimatePresence>
+                                {isChatDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="absolute top-[80%] left-0 w-64 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 mt-1"
+                                    >
+                                        <div className="space-y-1">
+                                            <Link href="/mbti" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                                                <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                                    <Users className="w-4 h-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold text-slate-800">MBTI 聊天室</p>
+                                                    <p className="text-[10px] text-slate-500">性格专家的对谈</p>
+                                                </div>
+                                            </Link>
+                                            <Link href="/lysk" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                                                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                    <Sparkles className="w-4 h-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold text-slate-800">极夜编辑器</p>
+                                                    <p className="text-[10px] text-slate-500">捕捉动人瞬间</p>
+                                                </div>
+                                            </Link>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        <div
+                            className="relative"
+                            onMouseEnter={() => setIsCommunityDropdownOpen(true)}
+                            onMouseLeave={() => setIsCommunityDropdownOpen(false)}
+                        >
+                            <button className="flex items-center gap-1 text-[13px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-8 uppercase tracking-widest">
+                                工具 <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isCommunityDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            <AnimatePresence>
+                                {isCommunityDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="absolute top-[80%] left-0 w-64 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 mt-1"
+                                    >
+                                        <div className="space-y-1">
+                                            <Link href="/blog" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                                                <div className="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                                                    <BookOpen className="w-4 h-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold text-slate-800">博客生成</p>
+                                                    <p className="text-[10px] text-slate-500">记录美好回忆</p>
+                                                </div>
+                                            </Link>
+                                            <Link href="/history" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                                                <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                                                    <History className="w-4 h-4" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold text-slate-800">历史记录</p>
+                                                    <p className="text-[10px] text-slate-500">查看过往对话</p>
+                                                </div>
+                                            </Link>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 </div>
+
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={handleEdit}
+                        className="p-3 hover:bg-[var(--bg-hover)] rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all flex items-center gap-2"
+                        title="编辑文章"
+                    >
+                        <Edit3 className="w-4 h-4" />
+                    </button>
                     <button
                         onClick={handleShare}
                         className="p-3 hover:bg-[var(--bg-hover)] rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all flex items-center gap-2"
                         title="分享文章"
                     >
                         {isCopied ? <span className="text-xs font-sans font-medium text-[var(--accent-main)]">已复制</span> : null}
-                        <Share2 className="w-5 h-5" />
+                        <Share2 className="w-4 h-4" />
                     </button>
                     <div className="h-6 w-px bg-[var(--border-light)] hidden md:block" />
                     <UserStatus />
+                    <button
+                        className="lg:hidden p-2 text-[var(--text-secondary)]"
+                        onClick={() => setIsMobileMenuOpen(true)}
+                    >
+                        <Menu className="w-6 h-6" />
+                    </button>
                 </div>
-            </header>
+            </nav>
 
-            <main className="pt-24 pb-12 px-6 max-w-3xl mx-auto">
+            {/* Mobile Menu Overlay */}
+            <AnimatePresence>
+                {isMobileMenuOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, x: '100%' }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: '100%' }}
+                        className="fixed inset-0 z-[60] bg-white md:hidden flex flex-col"
+                    >
+                        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                            <Logo className="w-8 h-8" showText={true} />
+                            <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-100 rounded-full">
+                                <X className="w-5 h-5 text-slate-600" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                            <div>
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">群聊</h3>
+                                <div className="space-y-2">
+                                    <Link href="/mbti" className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50">
+                                        <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-500">
+                                            <Users className="w-5 h-5" />
+                                        </div>
+                                        <div className="font-bold text-slate-700">MBTI 聊天室</div>
+                                    </Link>
+                                    <Link href="/lysk" className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-500">
+                                            <Sparkles className="w-5 h-5" />
+                                        </div>
+                                        <div className="font-bold text-slate-700">极夜编辑器</div>
+                                    </Link>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">创作工具</h3>
+                                <div className="space-y-2">
+                                    <Link href="/blog" className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50">
+                                        <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-500">
+                                            <BookOpen className="w-5 h-5" />
+                                        </div>
+                                        <div className="font-bold text-slate-700">博客生成</div>
+                                    </Link>
+                                    <Link href="/history" className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-500">
+                                            <History className="w-5 h-5" />
+                                        </div>
+                                        <div className="font-bold text-slate-700">历史记录</div>
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <main className="pt-24 pb-12 px-6 max-w-4xl mx-auto">
                 <motion.article
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="artistic-prose"
                 >
-                    <header className="mb-12 text-center">
+                    <header className="mb-12">
                         <motion.div
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
+                            className={`flex flex-col md:flex-row gap-8 md:gap-12 items-center ${coverImage ? 'text-left' : 'text-center'}`}
                         >
-                            <div className="flex items-center justify-center gap-3 mb-6 opacity-30">
-                                <div className="h-px w-8 bg-[var(--accent-main)]" />
-                                <Feather className="w-4 h-4 text-[var(--accent-main)]" />
-                                <div className="h-px w-8 bg-[var(--accent-main)]" />
-                            </div>
-                            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-[var(--text-primary)] mb-6 leading-tight">
-                                {post.title}
-                            </h1>
-                            <div className="flex items-center justify-center gap-4 text-sm font-medium text-[var(--text-tertiary)] tracking-widest uppercase">
-                                <span className="flex items-center gap-1.5">
-                                    <Clock className="w-4 h-4 text-[var(--accent-main)]/80" />
-                                    {new Date(post.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' })}
-                                </span>
-                                <span className="text-[var(--border-light)]">•</span>
-                                <span>AI 灵感协作</span>
+                            {coverImage && (
+                                <div className="w-full md:w-[280px] flex-shrink-0">
+                                    <img
+                                        src={coverImage}
+                                        alt="Cover"
+                                        className="w-full aspect-[3/4] object-cover rounded-2xl shadow-xl rotate-2 hover:rotate-0 transition-transform duration-500 border border-[var(--border-light)]"
+                                    />
+                                </div>
+                            )}
+                            <div className="flex-1 w-full">
+                                <div className={`flex items-center gap-3 mb-6 opacity-30 ${coverImage ? 'justify-start' : 'justify-center'}`}>
+                                    <div className="h-px w-8 bg-[var(--accent-main)]" />
+                                    <Feather className="w-4 h-4 text-[var(--accent-main)]" />
+                                    <div className="h-px w-8 bg-[var(--accent-main)]" />
+                                </div>
+                                <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-[var(--text-primary)] mb-6 leading-tight">
+                                    {post.title}
+                                </h1>
+                                <div className={`flex items-center gap-4 text-sm font-medium text-[var(--text-tertiary)] tracking-widest uppercase ${coverImage ? 'justify-start' : 'justify-center'}`}>
+                                    <span className="flex items-center gap-1.5">
+                                        <Clock className="w-4 h-4 text-[var(--accent-main)]/80" />
+                                        {new Date(post.date).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Shanghai' })}
+                                    </span>
+                                    <span className="text-[var(--border-light)]">•</span>
+                                    <span>AI 灵感协作</span>
+                                </div>
                             </div>
                         </motion.div>
                     </header>
 
                     <div className="markdown-content artistic-prose mb-20">
-                        <ReactMarkdown>{post.content}</ReactMarkdown>
+                        <ReactMarkdown
+                            urlTransform={(url) => url}
+                            components={{
+                                img: ({ node, ...props }) => (
+                                    <img
+                                        {...props}
+                                        className="max-w-full md:max-w-[300px] max-h-[300px] rounded-xl border border-[var(--border-light)] shadow-md object-cover my-6 mx-auto block"
+                                    />
+                                )
+                            }}
+                        >
+                            {cleanContent}
+                        </ReactMarkdown>
                     </div>
 
                     {/* Interaction Section */}
