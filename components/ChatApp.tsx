@@ -25,7 +25,19 @@ type ParsedMbtiReply = {
 type ViewMode = 'mbti' | 'game';
 type InteractionMode = 'text' | 'voice';
 
-const allMbtiRoles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
+const allMbtiRoles = [
+  "INTJ", "INTP", "ENTJ", "ENTP", // 紫人 (Analysts)
+  "INFJ", "INFP", "ENFJ", "ENFP", // 绿人 (Diplomats)
+  "ISTJ", "ISFJ", "ESTJ", "ESFJ", // 蓝人 (Sentinels)
+  "ISTP", "ISFP", "ESTP", "ESFP"  // 黄人 (Explorers)
+] as const;
+
+const mbtiGroups = [
+  { name: '分析家', color: '#A855F7', roles: ["INTJ", "INTP", "ENTJ", "ENTP"] }, // 紫色
+  { name: '外交官', color: '#22C55E', roles: ["INFJ", "INFP", "ENFJ", "ENFP"] }, // 绿色
+  { name: '守护者', color: '#3B82F6', roles: ["ISTJ", "ISFJ", "ESTJ", "ESFJ"] }, // 蓝色
+  { name: '探险家', color: '#EAB308', roles: ["ISTP", "ISFP", "ESTP", "ESFP"] }  // 黄色
+];
 
 const themes = {
   emerald: {
@@ -433,18 +445,27 @@ const getRoleEmoji = (role: string, mode: ViewMode) => {
   }
 
   switch (role) {
-    case 'ENTJ':
-      return '🧠';
-    case 'ISTJ':
-      return '�';
-    case 'ENFP':
-      return '🌟';
-    case 'INFP':
-      return '🌿';
-    case 'ENFJ':
-      return '😊';
-    default:
-      return '💬';
+    // 分析家
+    case 'INTJ': return '♟️';
+    case 'INTP': return '🧪';
+    case 'ENTJ': return '🧠';
+    case 'ENTP': return '🧨';
+    // 外交官
+    case 'INFJ': return '🔮';
+    case 'INFP': return '🌿';
+    case 'ENFJ': return '😊';
+    case 'ENFP': return '🌟';
+    // 守护者
+    case 'ISTJ': return '📋';
+    case 'ISFJ': return '🛡️';
+    case 'ESTJ': return '📢';
+    case 'ESFJ': return '🤝';
+    // 探险家
+    case 'ISTP': return '🛠️';
+    case 'ISFP': return '🎨';
+    case 'ESTP': return '⚡';
+    case 'ESFP': return '🎉';
+    default: return '💬';
   }
 };
 
@@ -470,11 +491,11 @@ const getRoleLabel = (role: string, mode: ViewMode) => {
 const getRoleAvatar = (role: string, mode: ViewMode) => {
   if (mode === 'game') {
     switch (role) {
-      case 'ENTJ': return '/mbti/avatars/祁煜.jpg';
-      case 'ISTJ': return '/mbti/avatars/黎深.jpg';
-      case 'ENFP': return '/mbti/avatars/沈星回.jpg';
-      case 'INFP': return '/mbti/avatars/夏以昼.jpg';
-      case 'ENFJ': return '/mbti/avatars/秦彻.jpg';
+      case 'ENTJ': case '祁煜': return '/mbti/avatars/祁煜.jpg';
+      case 'ISTJ': case '黎深': return '/mbti/avatars/黎深.jpg';
+      case 'ENFP': case '沈星回': return '/mbti/avatars/沈星回.jpg';
+      case 'INFP': case '夏以昼': return '/mbti/avatars/夏以昼.jpg';
+      case 'ENFJ': case '秦彻': return '/mbti/avatars/秦彻.jpg';
       default: return null;
     }
   }
@@ -505,139 +526,149 @@ const getRoleStatusText = (role: string, mode: ViewMode) => {
   }
 
   switch (role) {
-    case 'ENTJ':
-      return '正在快速扫一眼全局，还在想怎么帮你定方向。';
-    case 'ISTJ':
-      return '在一旁默默记笔记，等你说完再补充细节和 checklist。';
-    case 'ENFP':
-      return '脑子里已经开了十个脑洞，只是在挑哪一个最好玩。';
-    case 'INFP':
-      return '认真听着你的情绪变化，在琢磨这件事对你意味着什么。';
-    case 'ENFJ':
-      return '在整理大家刚才的点子，准备帮你收个小结。';
+    // 分析家 (Purple)
+    case 'INTJ': return '正在推演某种极其复杂的逻辑，暂时没空闲聊。';
+    case 'INTP': return '刚发现一个逻辑漏洞，正专注于重构自己的想法。';
+    case 'ENTJ': return '正在快速扫一眼全局，还在想怎么帮你定方向。';
+    case 'ENTP': return '已经想到了三个能把现状彻底搞乱的反直觉点子。';
+
+    // 外交官 (Green)
+    case 'INFJ': return '在字里行间寻找你没说出口的深层含义。';
+    case 'INFP': return '认真听着你的情绪变化，在琢磨这件事对你意味着什么。';
+    case 'ENFJ': return '在整理大家刚才的点子，准备帮你收个小结。';
+    case 'ENFP': return '脑子里已经开了十个脑洞，只是在挑哪一个最好玩。';
+
+    // 守护者 (Blue)
+    case 'ISTJ': return '在一旁默默记笔记，等你说完再补充细节和 checklist。';
+    case 'ISFJ': return '在留意窗外的情况，确保大家讨论的环境足够安心。';
+    case 'ESTJ': return '在看表计算时间，随时准备把偏离的话题拉回来。';
+    case 'ESFJ': return '在观察每个人的反应，确保没人感到被冷落。';
+
+    // 探险家 (Yellow)
+    case 'ISTP': return '在旁边把玩工具，顺便看看这件事有没有更省力的解法。';
+    case 'ISFP': return '在构思这一幕如果画下来，该用什么样的配色。';
+    case 'ESTP': return '有点坐不住了，正等你说完直接带大家去实操。';
+    case 'ESFP': return '正准备在下个空档讲个笑话，把气氛燥起来。';
+
     default:
       return '在旁边听着，还没决定要不要插话。';
   }
 };
 
-function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete }: { parsed: ParsedMbtiReply; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void }) {
+const getMbtiColor = (role: string) => {
+  const group = mbtiGroups.find(g => g.roles.includes(role as any));
+  return group?.color || '#94a3b8';
+};
+
+function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete }: { parsed: any; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void }) {
   const [visibleCount, setVisibleCount] = useState(0);
 
-  // 当消息 ID 变化时，初始化可见计数（避免每次流式内容变化都重置）
   useEffect(() => {
     setVisibleCount(0);
   }, [messageId]);
 
-  // 在角色数量增长时，逐步增加可见计数；不因 parsed 对象变化而重置
   useEffect(() => {
     if (parsed.roles.length === 0) return;
     if (visibleCount >= parsed.roles.length) return;
 
     const interval = setInterval(() => {
-      setVisibleCount((prev) => {
-        if (prev >= parsed.roles.length) return prev;
-        return prev + 1;
-      });
-    }, 700);
-
+      setVisibleCount((prev) => (prev >= parsed.roles.length ? prev : prev + 1));
+    }, 600);
     return () => clearInterval(interval);
   }, [parsed.roles.length, visibleCount]);
 
   const visibleRoles = parsed.roles.slice(0, visibleCount || 1);
-  const spokenRoles = new Set(parsed.roles.map((r) => r.role));
-  const nameToSlot: Record<string, (typeof allMbtiRoles)[number]> = {
-    '祁煜': 'ENTJ',
-    '黎深': 'ISTJ',
-    '沈星回': 'ENFP',
-    '夏以昼': 'INFP',
-    '秦彻': 'ENFJ',
-  };
+  const spokenRoles = new Set(parsed.roles.map((r: any) => r.role));
+
   const allowedSlots = (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0)
-    ? (viewMode === 'game'
-      ? selectedGameRoles.map((n) => nameToSlot[n]).filter(Boolean)
-      : selectedGameRoles as any)
-    : allMbtiRoles;
-  const silentRoles = allowedSlots.filter((r) => !spokenRoles.has(r));
+    ? selectedGameRoles
+    : (viewMode === 'game' ? ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] : allMbtiRoles);
+
+  const silentRoles = allowedSlots.filter((r: any) => {
+    const roleId = (viewMode === 'game') ? r : r;
+    return !spokenRoles.has(roleId);
+  });
 
   return (
-    <div className={`space-y-4 ${themes[theme].text}`}>
+    <div className={`space-y-6 ${themes[theme].text}`}>
+      {/* 1. Intro Bubble (AI System/Narration) */}
       {parsed.intro && (
         <div className="flex gap-3">
-          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white/40 backdrop-blur-md shadow-sm">
-            <Sparkles className="w-4 h-4" style={{ color: themes[theme].accent }} />
+          <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white/40 backdrop-blur-md shadow-sm border border-white/50">
+            <Sparkles className="w-5 h-5" style={{ color: themes[theme].accent }} />
           </div>
-          <div className={`p-4 rounded-2xl max-w-[85%] ${themes[theme].cardBg} shadow-sm border border-black/5`}>
-            <div className="text-sm prose max-w-none leading-relaxed text-slate-800">
+          <div className={`p-4 rounded-2xl max-w-[90%] ${themes[theme].cardBg} shadow-sm border border-black/5 rounded-tl-sm`}>
+            <div className="text-sm prose prose-slate max-w-none leading-relaxed text-slate-700">
               <ReactMarkdown>{parsed.intro}</ReactMarkdown>
             </div>
           </div>
         </div>
       )}
 
-      {visibleRoles.map((block) => (
-        <div key={`${messageId}-${block.role}`} className="flex gap-3">
-          <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-black/5 overflow-hidden`}>
-            {viewMode === 'game' ? (
-              getRoleAvatar(block.role, viewMode) ? (
-                <img src={getRoleAvatar(block.role, viewMode)!} alt={getRoleLabel(block.role, viewMode)} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-[10px] font-bold text-slate-400">
-                  {getRoleLabel(block.role, viewMode)}
-                </span>
-              )
-            ) : (
-              <span className="text-xl">{getRoleEmoji(block.role, viewMode)}</span>
-            )}
-          </div>
-          <div className={`p-4 rounded-2xl max-w-[85%] border-l-4 ${themes[theme].cardBg} shadow-md border-black/5`} style={{ borderLeftColor: themes[theme].accent }}>
-            <div className="text-sm prose max-w-none leading-relaxed text-slate-800">
-              {getRoleLabel(block.role, viewMode) && (
-                <div className="text-[10px] font-black mb-1 uppercase tracking-[0.2em]" style={{ color: themes[theme].accent }}>
-                  {getRoleLabel(block.role, viewMode)}
-                </div>
-              )}
-              <ReactMarkdown>{block.text}</ReactMarkdown>
-            </div>
-          </div>
-        </div>
-      ))}
-
-      {silentRoles.length > 0 && (
-        <div className="mt-1.5 flex flex-col gap-1.5 pl-12">
-          {silentRoles.map((role) => (
-            <div
-              key={`${messageId}-${role}-status`}
-              className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center bg-white/60 overflow-hidden`}
-              >
-                {viewMode === 'game' && getRoleAvatar(role, viewMode) ? (
-                  <img src={getRoleAvatar(role, viewMode)!} alt={getRoleLabel(role, viewMode)} className="w-full h-full object-cover" />
+      {/* 2. Individual Role Bubbles */}
+      {visibleRoles.map((block: any, idx: number) => {
+        const roleColor = viewMode === 'game' ? themes[theme].accent : getMbtiColor(block.role);
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            key={`${messageId}-${block.role}-${idx}`}
+            className="flex gap-3"
+          >
+            {/* Avatar Section */}
+            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+              <div className="w-11 h-11 rounded-full flex items-center justify-center bg-white shadow-md border-2 overflow-hidden"
+                style={{ borderColor: roleColor }}>
+                {viewMode === 'game' && getRoleAvatar(block.role, viewMode) ? (
+                  <img src={getRoleAvatar(block.role, viewMode)!} alt={block.role} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-[10px]">{getRoleEmoji(role, viewMode)}</span>
+                  <span className="text-2xl drop-shadow-sm">{getRoleEmoji(block.role, viewMode)}</span>
                 )}
               </div>
-              <span>
-                {getRoleLabel(role, viewMode) && (
-                  <span>{getRoleLabel(role, viewMode)}：</span>
-                )}
-                {getRoleStatusText(role, viewMode)}
-              </span>
             </div>
-          ))}
-        </div>
+
+            {/* Content Bubble */}
+            <div className="flex-1 max-w-[85%] space-y-1">
+              <div className="flex items-center gap-2 ml-1">
+                <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: roleColor }}>
+                  {getRoleLabel(block.role, viewMode)}
+                </span>
+                <div className="h-[1px] flex-1 bg-gradient-to-r from-slate-200 to-transparent opacity-50" />
+              </div>
+
+              <div className={`p-4 rounded-2xl ${themes[theme].cardBg} shadow-sm border border-black/5 relative overflow-hidden`}>
+                {/* Accent line on the left inside the bubble */}
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: roleColor }} />
+                <div className="text-[14.5px] prose prose-sm max-w-none leading-relaxed text-slate-800 font-medium">
+                  <ReactMarkdown>{block.text}</ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        );
+      })}
+
+      {/* 3. Silent/Status Info (Compact) */}
+
+
+      {/* 4. Outro/Summary Bubble */}
+      {parsed.outro && visibleCount >= parsed.roles.length && (
+        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 justify-end pr-4">
+          <div className={`p-4 rounded-2xl bg-white/50 backdrop-blur-md border border-dashed border-slate-300 max-w-[80%] shadow-inner relative`}>
+            <div className="absolute -top-2 left-4 px-2 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">总结</div>
+            <div className="text-sm italic text-slate-500 leading-relaxed">
+              <ReactMarkdown>{parsed.outro}</ReactMarkdown>
+            </div>
+          </div>
+        </motion.div>
       )}
 
-      {/* Recall Button for Assistant Message */}
+      {/* Recall Button */}
       {onDelete && (
-        <div className="flex justify-start pl-11">
-          <button
-            onClick={() => onDelete(messageId)}
-            className="flex items-center gap-1 text-[10px] font-bold text-slate-400 opacity-30 hover:opacity-100 hover:text-red-500 transition-all py-1"
-          >
+        <div className="flex justify-start pl-14">
+          <button onClick={() => onDelete(messageId)} className="flex items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-red-400 transition-all opacity-50 hover:opacity-100">
             <Trash2 className="w-3 h-3" />
-            <span>撤回</span>
+            <span>撤回此轮对话</span>
           </button>
         </div>
       )}
@@ -692,15 +723,34 @@ export default function ChatApp() {
   // Mode-based selectable chat members
   const allGameRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] as const;
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const rolesStorageKey = `chat_selected_roles_${viewMode}`;
 
+  // Load selection from storage
   useEffect(() => {
-    // Sync roles when mode changes or if empty
+    const saved = window.localStorage.getItem(rolesStorageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedRoles(parsed);
+          return;
+        }
+      } catch (e) { }
+    }
+    // Default fallback
     if (viewMode === 'game') {
       setSelectedRoles([...allGameRoles]);
     } else {
       setSelectedRoles([...allMbtiRoles]);
     }
   }, [viewMode]);
+
+  // Persist selection
+  useEffect(() => {
+    if (selectedRoles.length > 0) {
+      window.localStorage.setItem(rolesStorageKey, JSON.stringify(selectedRoles));
+    }
+  }, [selectedRoles, rolesStorageKey]);
 
   // --- Ambient Sound Engine (Local & Robust) ---
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -869,10 +919,11 @@ export default function ChatApp() {
   } as const;
   const mbtiRequestHeaders = {
     'x-view-mode': 'mbti',
+    'x-selected-roles': selectedRoles.join(','),
     'x-user-profile': encodeURIComponent(userProfile || ''),
   } as const;
   const gameApi = `/api/chat?viewMode=game&selectedRoles=${encodeURIComponent(selectedRoles.join(','))}&userProfile=${encodeURIComponent(userProfile || '')}`;
-  const mbtiApi = `/api/chat?viewMode=mbti&userProfile=${encodeURIComponent(userProfile || '')}`;
+  const mbtiApi = `/api/chat?viewMode=mbti&selectedRoles=${encodeURIComponent(selectedRoles.join(','))}&userProfile=${encodeURIComponent(userProfile || '')}`;
   const chatMbti = useChat({
     id: 'mbti-session',
     api: mbtiApi,
@@ -1071,16 +1122,15 @@ export default function ChatApp() {
 
   const parseMbtiGroupReply = (content: string) => {
     const lines = content.split('\n');
-    const roles = ["ENTJ", "ISTJ", "ENFP", "INFP", "ENFJ"] as const;
+    const roles = allMbtiRoles;
     type Role = (typeof roles)[number];
 
     let introLines: string[] = [];
+    let outroLines: string[] = []; // 用于存放“小结”
     let currentRole: Role | null = null;
     let buffer: string[] = [];
     const roleBlocks: { role: Role; text: string }[] = [];
 
-    // 允许前面有 Markdown 标记或列表前缀，识别 MBTI 或 男主中文名
-    // 中文名与 MBTI 槽位映射：ENTJ->祁煜, ISTJ->黎深, ENFP->沈星回, INFP->夏以昼, ENFJ->秦彻
     const nameToSlot: Record<string, Role> = {
       '祁煜': 'ENTJ',
       '黎深': 'ISTJ',
@@ -1088,20 +1138,31 @@ export default function ChatApp() {
       '夏以昼': 'INFP',
       '秦彻': 'ENFJ',
     };
-    const roleRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(ENTJ|ISTJ|ENFP|INFP|ENFJ|祁煜|黎深|沈星回|夏以昼|秦彻)[：:]/;
+    // 支持 16 型人格和 5 位男主，且匹配小结/总结
+    const roleRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(INTJ|INTP|ENTJ|ENTP|INFJ|INFP|ENFJ|ENFP|ISTJ|ISFJ|ESTJ|ESFJ|ISTP|ISFP|ESTP|ESFP|祁煜|黎深|沈星回|夏以昼|秦彻)[：:]/i;
+    const summaryRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(小结|总结|总而言之)[：:]/i;
 
     for (const line of lines) {
       const match = line.match(roleRegex);
+      const summaryMatch = line.match(summaryRegex);
+
       if (match) {
         if (currentRole) {
           roleBlocks.push({ role: currentRole, text: buffer.join('\n').trim() });
         } else if (buffer.length > 0) {
           introLines = buffer.slice();
         }
-        const tag = match[1];
+        const tag = match[1].toUpperCase();
         const mapped = (nameToSlot as any)[tag] || tag;
         currentRole = mapped as Role;
         buffer = [line.replace(roleRegex, '').trim()];
+      } else if (summaryMatch) {
+        if (currentRole) {
+          roleBlocks.push({ role: currentRole, text: buffer.join('\n').trim() });
+          currentRole = null;
+        }
+        buffer = [line.replace(summaryRegex, '').trim()];
+        outroLines = buffer; // 接下来的内容放入 outro
       } else {
         buffer.push(line);
       }
@@ -1109,14 +1170,13 @@ export default function ChatApp() {
 
     if (currentRole) {
       roleBlocks.push({ role: currentRole, text: buffer.join('\n').trim() });
+    } else if (outroLines.length > 0) {
+      // 已经在 outro 里了
     } else if (buffer.length > 0 && introLines.length === 0) {
       introLines = buffer.slice();
     }
 
-    return {
-      intro: introLines.join('\n').trim(),
-      roles: roleBlocks,
-    };
+    return { intro: introLines.join('\n').trim(), roles: roleBlocks, outro: outroLines.join('\n').trim() };
   };
 
   const handleCopy = () => {
@@ -1140,13 +1200,26 @@ export default function ChatApp() {
     const content = getMessageContent(lastMessage);
     if (!content?.trim()) return;
 
-    // 如果是新消息，重置累积文本
+    // 关键修正：防止切换模式时朗读历史消息
+    // 如果当前并未处于加载状态，且该消息 ID 没有被“正在流式处理”的 Ref 跟踪过，
+    // 说明它是一条历史消息（或者是在 Text 模式下生成完的），此时不应触发朗读。
+    if (!isLoading && currentStreamingMessageRef.current !== lastMessage.id) {
+      return;
+    }
+
+    // 如果是新消息（必须是在 loading 状态下遇到新 ID），重置累积文本
     if (lastMessage.id !== currentStreamingMessageRef.current) {
-      currentStreamingMessageRef.current = lastMessage.id;
-      accumulatedTextRef.current = '';
-      audioQueueRef.current = [];
-      processedSentencesRef.current.clear();
-      ttsProcessedRef.current = false;
+      // 只有在 isLoading 为 true 时才允许初始化新消息的 TTS 状态
+      // 这样能确保我们只朗读“正在生成”的消息，而不是切模式时看到的旧消息
+      if (isLoading) {
+        currentStreamingMessageRef.current = lastMessage.id;
+        accumulatedTextRef.current = '';
+        audioQueueRef.current = [];
+        processedSentencesRef.current.clear();
+        ttsProcessedRef.current = false;
+      } else {
+        return;
+      }
     }
 
     // 更新累积文本
@@ -1345,9 +1418,11 @@ export default function ChatApp() {
 
       // MBTI 模式：检测角色前缀并切换声音
       if (viewMode === 'mbti') {
-        const mbtiMatch = sentence.match(/^(ENTJ|ISTJ|ENFP|INFP|ENFJ)[：:]/);
+        const mbtiMatch = sentence.match(/^(INTJ|INTP|ENTJ|ENTP|INFJ|INFP|ENFJ|ENFP|ISTJ|ISFJ|ESTJ|ESFJ|ISTP|ISFP|ESTP|ESFP)[：:]/i);
         if (mbtiMatch) {
-          voice = mbtiMatch[1] as any;
+          voice = mbtiMatch[1].toUpperCase() as any;
+          // 去掉角色前缀，只播报内容
+          textToSpeak = sentence.replace(/^(INTJ|INTP|ENTJ|ENTP|INFJ|INFP|ENFJ|ENFP|ISTJ|ISFJ|ESTJ|ESFJ|ISTP|ISFP|ESTP|ESFP)[：:]/i, '');
         }
       }
 
@@ -1639,12 +1714,24 @@ export default function ChatApp() {
           role: 'user',
           content: contentForModel,
           experimental_attachments: attachments as any
-        } as any);
+        } as any, {
+          body: {
+            viewMode,
+            selectedRoles: selectedRoles.length > 0 ? selectedRoles : (viewMode === 'game' ? ['祁煜', '黎深', '沈星回', '夏以昼', '秦彻'] : ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ']),
+            userProfile
+          }
+        });
       } else {
         await sendMessageActive({
           role: 'user',
           content: contentForModel
-        } as any);
+        } as any, {
+          body: {
+            viewMode,
+            selectedRoles: selectedRoles.length > 0 ? selectedRoles : (viewMode === 'game' ? ['祁煜', '黎深', '沈星回', '夏以昼', '秦彻'] : ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ']),
+            userProfile
+          }
+        });
       }
 
       // store user message (simplified for db, normally might need to store image URLs)
@@ -1842,17 +1929,20 @@ export default function ChatApp() {
           </div>
 
           {/* Mid: Creation Section */}
-          <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
-            <div className="py-2">
+          {/* Mid: Creation Section */}
+          <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto custom-scrollbar pt-2">
+            <div className="pb-1">
               <button
                 onClick={() => setIsChatSubMenuOpen(!isChatSubMenuOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--text-primary)]"
+                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--text-primary)] mb-1"
               >
                 <div className="flex items-center gap-3">
-                  <MessageCircle className="w-4 h-4 text-[var(--accent-main)]" />
+                  <div className="w-5 h-5 flex items-center justify-center rounded-md bg-[var(--accent-main)]/10 text-[var(--accent-main)]">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  </div>
                   <span>创作路径</span>
                 </div>
-                {isChatSubMenuOpen ? <ChevronDown className="w-4 h-4 opacity-40" /> : <ChevronRight className="w-4 h-4 opacity-40" />}
+                {isChatSubMenuOpen ? <ChevronDown className="w-3.5 h-3.5 opacity-40" /> : <ChevronRight className="w-3.5 h-3.5 opacity-40" />}
               </button>
               <AnimatePresence>
                 {isChatSubMenuOpen && (
@@ -1860,78 +1950,77 @@ export default function ChatApp() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden mt-1 ml-4 space-y-1"
+                    className="overflow-hidden space-y-0.5 ml-1"
                   >
                     <Link
                       href="/mbti"
                       onClick={() => setIsMobileSidebarOpen(false)}
-                      className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/mbti' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                      className={`relative flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-all ml-7 ${pathname === '/mbti' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
                     >
-                      · MBTI 创作型
+                      {pathname === '/mbti' && <motion.div layoutId="sidebar-active" className="absolute left-0 w-1 h-3 rounded-full bg-[var(--accent-main)]" />}
+                      <span>MBTI 创作型</span>
                     </Link>
                     <Link
                       href="/lysk"
                       onClick={() => setIsMobileSidebarOpen(false)}
-                      className={`block px-3 py-2 text-xs rounded-lg transition-colors ${pathname === '/lysk' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                      className={`relative flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-all ml-7 ${pathname === '/lysk' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
                     >
-                      · 恋与深空同人
+                      {pathname === '/lysk' && <motion.div layoutId="sidebar-active" className="absolute left-0 w-1 h-3 rounded-full bg-[var(--accent-main)]" />}
+                      <span>恋与深空同人</span>
                     </Link>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            <div className="h-px bg-[var(--border-light)] my-2 mx-3 opacity-50" />
+            <div className="h-px bg-[var(--border-light)] my-3 mx-2 opacity-40" />
 
             <Link
               href="/blog"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/blog' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/blog' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              <div className={`w-0.5 h-4 bg-[var(--accent-main)] absolute left-0 ${pathname === '/blog' ? 'opacity-100' : 'opacity-0'}`} />
-              <LayoutGrid className="w-4 h-4" />
+              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/blog' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </div>
               <span>博客广场</span>
             </Link>
 
             <Link
               href="/blog"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/my-blogs' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/my-blogs' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              <PenTool className="w-4 h-4" />
+              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/my-blogs' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+                <PenTool className="w-3.5 h-3.5" />
+              </div>
               <span>我的博客</span>
             </Link>
-
-            <div className="h-px bg-[var(--border-light)] my-4 mx-3" />
 
             <Link
               href="/history"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${pathname === '/history' ? 'text-[var(--accent-main)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/history' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              <History className="w-4 h-4" />
+              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/history' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+                <History className="w-3.5 h-3.5" />
+              </div>
               <span>聊天历史</span>
             </Link>
           </nav>
 
           {/* Bottom: Settings & Modes */}
-          <div className="px-4 py-6 space-y-2 border-t border-[var(--border-light)] bg-[var(--bg-page)]">
-            <button
-              onClick={() => setIsPersonaDrawerOpen(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
-            >
-              <Users className="w-4 h-4" />
-              <span>群聊人物</span>
-            </button>
-
+          <div className="px-3 py-4 space-y-1 border-t border-[var(--border-light)] bg-[var(--bg-page)]/50">
             <button
               onClick={() => setIsAppearanceDrawerOpen(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)]"
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] group"
             >
-              <Palette className="w-4 h-4" />
+              <div className="w-5 h-5 flex items-center justify-center rounded-md bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">
+                <Palette className="w-3.5 h-3.5" />
+              </div>
               <span>视觉风格</span>
             </button>
-            <div className="pt-4 mt-2 border-t border-[var(--border-light)]">
+            <div className="pt-3 mt-1 border-t border-[var(--border-light)]/50 px-1">
               <UserStatus isSidebar={true} />
             </div>
           </div>
@@ -1996,16 +2085,63 @@ export default function ChatApp() {
         {/* Global Persona Bar (if active) */}
         {(viewMode === 'game' || viewMode === 'mbti') && (
           <div className="px-4 py-2 border-b border-[var(--border-light)] bg-[var(--bg-panel)]/40 backdrop-blur-sm">
-            <div className="max-w-4xl mx-auto flex items-center justify-between text-xs">
+            <div className="max-w-4xl mx-auto flex items-center justify-start gap-4 text-xs">
+              <button
+                onClick={() => setIsPersonaDrawerOpen(true)}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity whitespace-nowrap"
+              >
+                <span className="text-[var(--text-tertiary)] text-sm">我的身份：</span>
+                <span className={`font-bold ${userPersona.name ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)] opacity-70'} text-sm`}>
+                  {userPersona.name || '未配置'}
+                </span>
+              </button>
+
+              <div className="h-4 w-px bg-[var(--border-light)]" />
+
               <button
                 onClick={() => setIsPersonaDrawerOpen(true)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <span className="text-[var(--text-tertiary)]">当前身份：</span>
-                <span className={`font-bold ${userPersona.name ? 'text-[var(--accent-main)]' : 'text-[var(--text-tertiary)] opacity-70'}`}>
-                  {userPersona.name || '未配置人设'}
-                </span>
-                {userPersona.name && <span className="px-1.5 py-0.5 rounded bg-[var(--accent-main)]/10 text-[10px] text-[var(--accent-main)] uppercase border border-[var(--accent-main)]/20">{userPersona.mbti || 'MBTI'}</span>}
+                <span className="text-[var(--text-tertiary)] text-sm whitespace-nowrap">群聊成员：</span>
+                {selectedRoles.length > 0 ? (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {selectedRoles.slice(0, 5).map((role, idx) => {
+                      const group = viewMode === 'mbti' ? mbtiGroups.find(g => g.roles.includes(role as any)) : null;
+                      const color = group?.color || '#475569';
+                      const bgColor = group ? `${group.color}15` : '#f1f5f9';
+                      const borderColor = group ? `${group.color}30` : '#e2e8f0';
+
+                      return (
+                        <div
+                          key={role}
+                          className="px-2 py-0.5 rounded-md text-[11px] font-bold border shadow-sm whitespace-nowrap flex items-center gap-1.5 transition-colors"
+                          style={{
+                            backgroundColor: bgColor,
+                            borderColor: borderColor,
+                            color: color
+                          }}
+                        >
+                          {viewMode === 'game' && getRoleAvatar(role, viewMode) ? (
+                            <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0 border border-black/5">
+                              <img src={getRoleAvatar(role, viewMode)!} alt={role} className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <span className="text-[10px] leading-none opacity-90 scale-110">{getRoleEmoji(role, viewMode)}</span>
+                          )}
+                          <span>{viewMode === 'game' ? getRoleLabel(role, viewMode) : role}</span>
+                        </div>
+                      );
+                    })}
+                    {selectedRoles.length > 5 && (
+                      <div className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-400 border border-slate-200">
+                        +{selectedRoles.length - 5}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-[var(--text-tertiary)] opacity-70 text-sm">未选择</span>
+                )}
+                <Settings className="w-4 h-4 text-[var(--accent-main)] ml-1 flex-shrink-0" />
               </button>
             </div>
           </div>
@@ -2025,61 +2161,63 @@ export default function ChatApp() {
               </motion.div>
             )}
 
-            {messages.map((m: any) => {
-              const content = getMessageContent(m);
-              const images = getMessageImages(m);
-              const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
-              const hasRoles = parsed && parsed.roles.length > 0;
+            {messages
+              .filter((m, index, self) => index === self.findIndex((t) => t.id === m.id))
+              .map((m: any) => {
+                const content = getMessageContent(m);
+                const images = getMessageImages(m);
+                const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
+                const hasRoles = parsed && parsed.roles.length > 0;
 
-              if (m.role !== 'assistant' || !hasRoles) {
-                return (
-                  <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                    <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
-                      {m.role === 'user' ? <div className="text-[10px] font-black uppercase">You</div> : <Sparkles className="w-4 h-4" />}
-                    </div>
-                    <div className={`p-4 max-w-[85%] relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
-                      <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
-                        <ReactMarkdown>{content}</ReactMarkdown>
-                        {images.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {images.map((img, idx) => (
-                              <div key={idx} className="relative group">
-                                <img
-                                  src={img}
-                                  alt="uploaded"
-                                  className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                if (m.role !== 'assistant' || !hasRoles) {
+                  return (
+                    <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                      <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 sm:mt-2 shadow-lg backdrop-blur-xl border border-white/30`} style={{ backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : 'rgba(255,255,255,0.6)', color: m.role === 'user' ? 'white' : themes[selectedTheme].accent }}>
+                        {m.role === 'user' ? <div className="text-[10px] font-black uppercase">You</div> : <Sparkles className="w-4 h-4" />}
                       </div>
+                      <div className={`p-4 max-w-[85%] relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
+                        <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
+                          <ReactMarkdown>{content}</ReactMarkdown>
+                          {images.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {images.map((img, idx) => (
+                                <div key={idx} className="relative group">
+                                  <img
+                                    src={img}
+                                    alt="uploaded"
+                                    className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
-                      {/* Recall Button */}
-                      <button
-                        onClick={() => deleteMessage(m.id)}
-                        className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>撤回</span>
-                      </button>
+                        {/* Recall Button */}
+                        <button
+                          onClick={() => deleteMessage(m.id)}
+                          className={`absolute -bottom-6 ${m.role === 'user' ? 'right-0' : 'left-0'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-red-500`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>撤回</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              }
+                  );
+                }
 
-              return (
-                <MbtiReply
-                  key={m.id}
-                  parsed={parsed!}
-                  messageId={m.id}
-                  theme={selectedTheme}
-                  viewMode={viewMode}
-                  onDelete={deleteMessage}
-                  selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
-                />
-              );
-            })}
+                return (
+                  <MbtiReply
+                    key={m.id}
+                    parsed={parsed!}
+                    messageId={m.id}
+                    theme={selectedTheme}
+                    viewMode={viewMode}
+                    onDelete={deleteMessage}
+                    selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
+                  />
+                );
+              })}
           </div>
         </div>
 
@@ -2317,32 +2455,75 @@ export default function ChatApp() {
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                 {/* Character Selection UI */}
                 {(viewMode === 'game' || viewMode === 'mbti') && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">成员勾选 (最多5人)</label>
-                      <span className="text-[10px] font-bold text-[var(--accent-main)] bg-[var(--accent-main)]/10 px-2 py-0.5 rounded-full">已选 {selectedRoles.length}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(viewMode === 'game' ? allGameRoles : allMbtiRoles).map(r => (
+                      <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">群聊成员 (最多5人)</label>
+                      <div className="flex items-center gap-2">
                         <button
-                          key={r}
-                          onClick={() => {
-                            setSelectedRoles(prev =>
-                              prev.includes(r)
-                                ? (prev.length > 1 ? prev.filter(x => x !== r) : prev)
-                                : [...prev, r].slice(0, 5)
-                            );
-                          }}
-                          className={`flex items-center gap-2 px-3 py-3 rounded-xl text-xs font-bold border transition-all ${selectedRoles.includes(r)
-                            ? 'bg-white border-[var(--accent-main)] text-[var(--accent-main)] shadow-sm'
-                            : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-200'
-                            }`}
+                          onClick={() => setSelectedRoles([])}
+                          className="text-[10px] font-bold text-red-400 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full transition-colors"
                         >
-                          <div className={`w-1.5 h-1.5 rounded-full ${selectedRoles.includes(r) ? 'bg-[var(--accent-main)]' : 'bg-slate-300'}`} />
-                          <span className="truncate">{getRoleLabel(r, viewMode)}</span>
+                          清空
                         </button>
-                      ))}
+                        <span className="text-[10px] font-bold text-[var(--accent-main)] bg-[var(--accent-main)]/10 px-2 py-0.5 rounded-full">已选 {selectedRoles.length}</span>
+                      </div>
                     </div>
+
+                    {viewMode === 'mbti' ? (
+                      <div className="space-y-6 text-left">
+                        {mbtiGroups.map(group => (
+                          <div key={group.name} className="space-y-2">
+                            <div className="flex items-center gap-2 px-1">
+                              <div className="w-1 h-3 rounded-full" style={{ backgroundColor: group.color }} />
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{group.name}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {group.roles.map(r => (
+                                <button
+                                  key={r}
+                                  onClick={() => {
+                                    setSelectedRoles(prev =>
+                                      prev.includes(r)
+                                        ? prev.filter(x => x !== r)
+                                        : [...prev, r].slice(0, 5)
+                                    );
+                                  }}
+                                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${selectedRoles.includes(r)
+                                    ? 'bg-white border-[var(--accent-main)] text-[var(--accent-main)] shadow-sm'
+                                    : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-200'
+                                    }`}
+                                >
+                                  <div className={`w-1.5 h-1.5 rounded-full ${selectedRoles.includes(r) ? 'bg-[var(--accent-main)]' : 'bg-slate-300'}`} />
+                                  <span className="truncate">{r}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {allGameRoles.map(r => (
+                          <button
+                            key={r}
+                            onClick={() => {
+                              setSelectedRoles(prev =>
+                                prev.includes(r)
+                                  ? prev.filter(x => x !== r)
+                                  : [...prev, r].slice(0, 5)
+                              );
+                            }}
+                            className={`flex items-center gap-2 px-3 py-3 rounded-xl text-xs font-bold border transition-all ${selectedRoles.includes(r)
+                              ? 'bg-white border-[var(--accent-main)] text-[var(--accent-main)] shadow-sm'
+                              : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-200'
+                              }`}
+                          >
+                            <div className={`w-1.5 h-1.5 rounded-full ${selectedRoles.includes(r) ? 'bg-[var(--accent-main)]' : 'bg-slate-300'}`} />
+                            <span className="truncate">{getRoleLabel(r, viewMode)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

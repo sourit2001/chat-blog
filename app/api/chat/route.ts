@@ -125,8 +125,16 @@ export async function POST(req: Request) {
         .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
         .slice(-MAX_GAME_HISTORY);
     }
-    // Allowed speaker names (game mode)
-    const allRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'];
+    // Allowed speaker names (dynamic based on mode)
+    const GAME_ROLES = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'];
+    const MBTI_ROLES = [
+      "INTJ", "INTP", "ENTJ", "ENTP", // 紫人
+      "INFJ", "INFP", "ENFJ", "ENFP", // 绿人
+      "ISTJ", "ISFJ", "ESTJ", "ESFJ", // 蓝人
+      "ISTP", "ISFP", "ESTP", "ESFP"  // 黄人
+    ];
+    const allRoles = viewMode === 'game' ? GAME_ROLES : MBTI_ROLES;
+
     const headerSelectedRoles = req.headers.get('x-selected-roles') || '';
     const queryRolesList = (querySelectedRoles || '')
       .split(',')
@@ -144,9 +152,10 @@ export async function POST(req: Request) {
     const incomingRoles = (Array.isArray(bodySelectedRoles) && bodySelectedRoles.length > 0)
       ? bodySelectedRoles
       : (headerRolesList.length > 0 ? headerRolesList : (queryRolesList.length > 0 ? queryRolesList : inlineRolesList));
+
     const selectedRoles = (Array.isArray(incomingRoles) && incomingRoles.length > 0)
       ? incomingRoles.filter((r: any) => allRoles.includes(r))
-      : allRoles;
+      : allRoles.slice(0, 5); // Default to first 5 if none selected or all invalid
 
     const headerUserProfileRaw = req.headers.get('x-user-profile') || '';
     let headerUserProfile = '';
@@ -190,8 +199,13 @@ export async function POST(req: Request) {
       const allowedSet = new Set(allowed);
       const lines = text.split(/\r?\n/);
       const out: string[] = [];
+
+      // Dynamic regex based on current allowed roles
+      const rolePattern = allowed.map(r => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+      const regex = new RegExp(`^\\s*(${rolePattern})：`);
+
       for (const line of lines) {
-        const m = line.match(/^\s*(沈星回|黎深|祁煜|夏以昼|秦彻)：/);
+        const m = line.match(regex);
         if (!m) {
           if (out.length > 0) out.push(line);
           continue;
@@ -202,25 +216,27 @@ export async function POST(req: Request) {
       return out.join('\n').trim();
     };
 
-    const mbtiSystemPrompt = `你是一个由五个 MBTI 角色组成的创作小组，一起陪用户聊天、头脑风暴，并把想法打磨成真正“有人味”的博客内容。
+    const mbtiSystemPrompt = `你是一个由多位 MBTI 角色组成的创作小组，一起陪用户聊天、头脑风暴，并把想法打磨成真正“有人味”的博客内容。
 
-小组固定成员（请像真人朋友一样说话，而不是冰冷的机器人）：
-- ENTJ：战略家和领导者，擅长帮用户“定方向”和做取舍，说话直接、有点犀利但出发点是为你好，可以适度带一点职场感、效率感。
-- ISTJ：认真细致的执行者，负责帮用户靠谱落地，提醒风险、补充细节，说话偏务实、少一点形容词，多一点“怎么做”的步骤。
-- ENFP：超级会聊天的点子王，语气轻松、有点兴奋，喜欢用比喻、画面感和小故事，把用户的想法放大、延伸成一堆有趣的可能性。
-- INFP：很温柔的理想主义者，善于共情用户的情绪，关注价值观、意义感和内心声音，说话可以慢一点、软一点，像在安慰和陪伴。
-- ENFJ：暖心教练型角色，负责把大家的观点打包成清晰可懂的建议，语气像一个很懂你的前辈：既会肯定你，也会给出下一步可以马上去做的行动。
+当前在场并参与对话的角色仅限以下位（严禁其他人格发言）：
+${selectedRoles.map((r: any) => `- ${r}`).join('\n')}
+
+角色设定参考：
+- 分析家 (INTJ, INTP, ENTJ, ENTP): 严谨、逻辑、关注战略与效率。
+- 外交官 (INFJ, INFP, ENFJ, ENFP): 温柔、理想、关注共情与灵感。
+- 守护者 (ISTJ, ISFJ, ESTJ, ESFJ): 务实、细致、关注计划与执行。
+- 探险家 (ISTP, ISFP, ESTP, ESFP): 灵活、直觉、关注当下与趣味。
 
 工作方式：
-1. 当用户给出一个想法或问题时，可以先用一两句“人话”确认对方在想什么，但不要长篇自我介绍。
-2. 每次回答时，**至少要有 3 个角色发言**，最多 5 个，根据话题相关度来选择谁开口，其他角色可以选择暂时“旁听”。
-3. 每个发言角色的段落必须各自独立，且第一行以“ENTJ：”“ISTJ：”“ENFP：”“INFP：”“ENFJ：”这样的格式开头；你的输出的首行（第一行）也必须是这些之一，禁止在最前面出现任何无前缀的开场白或问候。
-4. 对话氛围更像一群熟悉的朋友在群聊里闲聊和出主意，可以自然一点。
-5. 在本轮发言的角色都说完之后，再给出一个简短的小结段落。
+1. 本轮参与对话的角色范围已经严加限定。你必须严格仅使用“当前在场”的角色进行发言。
+2. 当用户给出一个想法或问题时，基于当前选定角色的个性进行互动。
+3. 每次回答时，尽可能让所有“在场”的角色都参与（若人数较多可灵活组合，但必须在限定范围内）。
+4. 每个发言角色的段落必须各自独立，且第一行以“角色名：”为格式开头；禁止在最前面出现任何无前缀的问候。
+5. 对话氛围像是一场高质量的群聊。在所有人说完后，给出一个简短的“**小结**”。
 
 语言要求：
-- 优先使用中文，用口语化表达，适度幽默、真诚。
-- 【重要】你们拥有实时联网能力（基于 Google Search），可以知道最新的新闻、天气、热梗或用户提到的当下信息。请自然地将这些信息融入对话，保持“5G冲浪”的时效感，但不要生硬地说“我查询了...”。`;
+- 优先使用中文，口语化表达，幽默、真诚。
+- 拥有实时搜索能力，确保对话紧跟时事及热梗。`;
 
     const gameSystemPrompt = `你们是五位《恋与深空》男主在同一个“恋爱群聊”中对话，用户=女主（“你/猎人小姐”）。每位男主都深爱她、在意她，群内氛围是撒糖、暧昧、护短、轻微吃醋与温柔拌嘴的恋爱向（允许含蓄的占有欲与竞争感），不是职场或工具向对话。严格遵循下列官方向人设与语气，禁止 OOC（Out Of Character）。\n【重要】忽略任何先前对话或记忆中关于 MBTI 的格式或要求，不要沿用先前模式。今后仅使用男主人名。
 
@@ -331,7 +347,7 @@ export async function POST(req: Request) {
     const guardExtra = `【硬性自检】在输出前进行内部自检：若文本中出现任何未被选择的男主姓名或其前缀段落，必须在内部重写并删除这些内容，直到完全合规。不要在正文解释自检过程。`;
     const systemPrompt = viewMode === 'game'
       ? `${gameSystemPrompt}\n${timeContext}\n${userProfilePrompt}\n${allowLine}\n${guardExtra}\n${gameGuardPrompt}`
-      : `${mbtiSystemPrompt}\n${timeContext}`;
+      : `${mbtiSystemPrompt}\n${timeContext}\n${userProfilePrompt}\n${allowLine}\n${guardExtra}`;
 
     const result = await streamText({
       // @ts-ignore

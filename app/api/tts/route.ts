@@ -15,12 +15,30 @@ const voicePresets: Record<string, string> = {
   qiyu: "Chinese (Mandarin)_Stubborn_Friend",              // 祁煜：固执的朋友
   lishen: "Chinese (Mandarin)_Gentleman",                  // 黎深：绅士温和男声
   xiayizhou: "Chinese (Mandarin)_Southern_Young_Man",      // 夏以昼：南方年轻人（温暖亲切）
-  // MBTI 角色声音：
-  ENTJ: "Chinese (Mandarin)_Gentle_Senior",
-  ISTJ: "Chinese (Mandarin)_Gentleman",
-  ENFP: "Chinese (Mandarin)_Pure-hearted_Boy",
-  INFP: "Chinese (Mandarin)_Soft_Girl",
-  ENFJ: "Chinese (Mandarin)_Refreshing_Young_Man",
+  // MBTI 角色声音映射：
+  // 分析家 (Analysts) - 紫色
+  INTJ: "Chinese (Mandarin)_Gentleman",               // 深沉、稳重
+  INTP: "Chinese (Mandarin)_Gentle_Senior",           // 温和、智慧
+  ENTJ: "Chinese (Mandarin)_Unrestrained_Young_Man",  // 强势、果断
+  ENTP: "Chinese (Mandarin)_Stubborn_Friend",         // 机智、爱抬杠
+
+  // 外交官 (Diplomats) - 绿色
+  INFJ: "Chinese (Mandarin)_Sweet_Lady",              // 温柔、坚定
+  INFP: "Chinese (Mandarin)_Soft_Girl",               // 柔软、治愈
+  ENFJ: "Chinese (Mandarin)_Refreshing_Young_Man",    // 热情、领袖感
+  ENFP: "Chinese (Mandarin)_Pure-hearted_Boy",        // 活力、单纯
+
+  // 守护者 (Sentinels) - 蓝色
+  ISTJ: "Chinese (Mandarin)_Gentleman",               // 严谨、务实
+  ISFJ: "Chinese (Mandarin)_Sweet_Lady",              // 温暖、照顾
+  ESTJ: "Chinese (Mandarin)_Unrestrained_Young_Man",  // 强硬、管理
+  ESFJ: "Chinese (Mandarin)_Sweet_Lady",              // 热情、周到
+
+  // 探险家 (Explorers) - 黄色
+  ISTP: "Chinese (Mandarin)_Stubborn_Friend",         // 酷、冷静
+  ISFP: "Chinese (Mandarin)_Soft_Girl",               // 灵动、艺术
+  ESTP: "Chinese (Mandarin)_Unrestrained_Young_Man",  // 无畏、冲动
+  ESFP: "Chinese (Mandarin)_Pure-hearted_Boy",        // 指挥、表演
 };
 
 export async function POST(req: NextRequest) {
