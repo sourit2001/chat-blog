@@ -194,24 +194,31 @@ export async function POST(req: Request) {
     const currentTimeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Shanghai' });
     const timeContext = `\n【当前时间（真实世界）】\n今天是 ${currentDateString}，时间 ${currentTimeString}。请基于这个“当前准确时间”来回答关于日期、节日或时效性新闻的问题。如果用户询问“今天”，指的就是这一天。`;
 
-    const filterDisallowedSpeakers = (text: string, allowed: string[]) => {
-      if (!text) return text;
+    const filterGameReplyByAllowedRoles = (text: string, allowedRoles?: string[]) => {
+      const allowed = Array.isArray(allowedRoles) ? allowedRoles.filter(Boolean) : [];
+      if (viewMode !== 'game') return text;
+      if (allowed.length === 0) return '';
       const allowedSet = new Set(allowed);
-      const lines = text.split(/\r?\n/);
+      const lines = (text || '').split(/\r?\n/);
       const out: string[] = [];
+      let isCurrentSpeakerAllowed = false;
 
-      // Dynamic regex based on current allowed roles
-      const rolePattern = allowed.map(r => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-      const regex = new RegExp(`^\\s*(${rolePattern})：`);
+      const allGameRolesPattern = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'].join('|');
+      const speakerRegex = new RegExp(`^\\s*(${allGameRolesPattern})：`);
 
       for (const line of lines) {
-        const m = line.match(regex);
-        if (!m) {
-          if (out.length > 0) out.push(line);
-          continue;
+        const m = line.match(speakerRegex);
+        if (m) {
+          const speaker = m[1];
+          if (allowedSet.has(speaker)) {
+            isCurrentSpeakerAllowed = true;
+            out.push(line);
+          } else {
+            isCurrentSpeakerAllowed = false;
+          }
+        } else if (isCurrentSpeakerAllowed) {
+          out.push(line);
         }
-        const speaker = m[1];
-        if (allowedSet.has(speaker)) out.push(line);
       }
       return out.join('\n').trim();
     };
@@ -248,7 +255,7 @@ ${selectedRoles.map((r: any) => `- ${r}`).join('\n')}
 
 【反模板与多样性（尽量执行，避免机械复读）】
 - 避免固定句式循环：同一角色不要每轮都用同一句开场、同一套安慰/占有欲表达。
-- 避免“标签化单一爱好”反复出现：祁煜不必每次提画画；夏以昼不必每次提做饭。需要提及时就换角度、换细节、或推进情节。
+- 避免“标签化单一爱好”反复出现：祁煜不必每次提画画；夏以昼不必每次每次提做饭。需要提及时就换角度、换细节、或推进情节。
 - 更像 MBTI 的“多人不同角度”：同一件事至少给出两种不同态度/处理方式（温柔哄、轻微吃醋、嘴硬护短、冷静安排、钓系逗弄）。
 
 【角色设定｜身份·背景·Evol·性格·说话风格·与你的关系】
@@ -301,7 +308,7 @@ ${selectedRoles.map((r: any) => `- ${r}`).join('\n')}
 - 夏以昼：青梅竹马的哥哥；过剩保护欲，在“放你自由成长”与“把你留在身边”间反复挣扎；厨艺好（会根据你的口味做各式家常菜，但不要老是提到红烧鸡翅），你会做苹果果肉汽水给他；曾在爆炸中失踪，归来已是执纪舰官（掌管远空舰队）；爱拼模型、篮球、舞蹈（曾在朋友酒吧开业表演），社交达人但在你面前更多呈现“哥哥的威严”；做俯卧撑健身。
 
 【输出规则（恋爱群聊风）】
-1. 每次让 3~5 人发言，严格用“角色名：内容”分段（角色名只能是：沈星回、黎深、祁煜、夏以昼、秦彻）。
+1. 必须根据当下的群聊成员选择（${selectedRoles.join('、')}）进行发言，禁止列表外的人出现。如果是多人模式，建议让 2~${selectedRoles.length} 人形成互动；如果是一个人，则只能由该角色单独发言，绝对不要“擅自替其他男主发声”。严格使用“角色名：内容”分段。
 2. 绝不出现 MBTI 标签（例如 ENTJ/ISTJ/ENFP/INFP/ENFJ 等）或任何四个大写英文字母人格缩写；开头不写任何无前缀寒暄/系统说明/角色介绍。若用户输入包含 MBTI 标签，必须改写并仅使用五位男主的人名作为段首前缀。
 3. 发言必须使用第一人称对“你”直接说话，可自然夹带亲昵称呼（如“宝宝/宝贝/小妹”等）；禁止出现“MC”字样；禁止第三人称旁观/转述（如“他/她”“他们在群里…”），禁止元叙述（如“系统/提示词/创作小组/小结/总结”）。
 4. 语气以情感为先：守护、宠溺、挑逗、吃醋、温柔拌嘴、在意与承诺。避免“解决问题/流程/清单/总结报告”的硬邦邦 AI 口吻。
@@ -357,7 +364,7 @@ ${selectedRoles.map((r: any) => `- ${r}`).join('\n')}
       topP: viewMode === 'game' ? 0.9 : 0.9,
       messages: viewMode === 'game' ? [...primingSamples, ...sanitizedMessages] : sanitizedMessages,
       onFinish: ({ text }) => {
-        const logged = viewMode === 'game' ? filterDisallowedSpeakers(text, selectedRoles) : text;
+        const logged = viewMode === 'game' ? filterGameReplyByAllowedRoles(text, selectedRoles) : text;
         console.log('Full response:', logged);
       },
     });

@@ -45,49 +45,49 @@ const themes = {
     name: '生机翠',
     bg: 'bg-[#F0FDF4]',
     pageBg: '#F0FDF4',
-    text: 'text-slate-900',
+    text: 'text-[var(--text-primary)]',
     accent: '#10B981',
     button: 'bg-[#10B981] hover:bg-[#059669] text-white shadow-lg shadow-emerald-500/20',
     bubbleUser: 'bg-[#10B981]/80 backdrop-blur-xl text-white shadow-xl shadow-emerald-500/10 border border-white/20',
-    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
-    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
-    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
+    bubbleBot: 'bg-[var(--bg-bubble-bot)] backdrop-blur-2xl border border-[var(--border-light)] shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-[var(--bg-input)] backdrop-blur-xl border border-[var(--border-light)] text-[var(--text-primary)]',
+    cardBg: 'bg-[var(--bg-card)] backdrop-blur-2xl border border-[var(--border-light)]',
   },
   indigo: {
     name: '极光紫',
     bg: 'bg-[#F5F3FF]',
     pageBg: '#F5F3FF',
-    text: 'text-slate-900',
+    text: 'text-[var(--text-primary)]',
     accent: '#6366F1',
     button: 'bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-lg shadow-indigo-500/20',
     bubbleUser: 'bg-[#6366F1]/80 backdrop-blur-xl text-white shadow-xl shadow-indigo-500/10 border border-white/20',
-    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
-    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
-    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
+    bubbleBot: 'bg-[var(--bg-bubble-bot)] backdrop-blur-2xl border border-[var(--border-light)] shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-[var(--bg-input)] backdrop-blur-xl border border-[var(--border-light)] text-[var(--text-primary)]',
+    cardBg: 'bg-[var(--bg-card)] backdrop-blur-2xl border border-[var(--border-light)]',
   },
   rose: {
     name: '晚霞粉',
     bg: 'bg-[#FFF1F2]',
     pageBg: '#FFF1F2',
-    text: 'text-slate-900',
+    text: 'text-[var(--text-primary)]',
     accent: '#F43F5E',
     button: 'bg-[#F43F5E] hover:bg-[#E11D48] text-white shadow-lg shadow-rose-500/20',
     bubbleUser: 'bg-[#F43F5E]/80 backdrop-blur-xl text-white shadow-xl shadow-rose-500/10 border border-white/20',
-    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
-    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
-    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
+    bubbleBot: 'bg-[var(--bg-bubble-bot)] backdrop-blur-2xl border border-[var(--border-light)] shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-[var(--bg-input)] backdrop-blur-xl border border-[var(--border-light)] text-[var(--text-primary)]',
+    cardBg: 'bg-[var(--bg-card)] backdrop-blur-2xl border border-[var(--border-light)]',
   },
   amber: {
     name: '晨晖金',
     bg: 'bg-[#FFFBEB]',
     pageBg: 'linear-gradient(135deg, #93c5fd 0%, #fdba74 100%)', // Blue-300 to Orange-300
-    text: 'text-slate-900',
+    text: 'text-[var(--text-primary)]',
     accent: '#F59E0B',
     button: 'bg-[#F59E0B] hover:bg-[#D97706] text-white shadow-lg shadow-amber-500/20',
     bubbleUser: 'bg-[#F59E0B]/80 backdrop-blur-xl text-white shadow-xl shadow-amber-500/10 border border-white/20',
-    bubbleBot: 'bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 px-4',
-    inputBg: 'bg-white/60 backdrop-blur-xl border border-white/60 text-slate-900',
-    cardBg: 'bg-white/30 backdrop-blur-2xl border border-white/40',
+    bubbleBot: 'bg-[var(--bg-bubble-bot)] backdrop-blur-2xl border border-[var(--border-light)] shadow-xl shadow-black/5 px-4',
+    inputBg: 'bg-[var(--bg-input)] backdrop-blur-xl border border-[var(--border-light)] text-[var(--text-primary)]',
+    cardBg: 'bg-[var(--bg-card)] backdrop-blur-2xl border border-[var(--border-light)]',
   },
 } as const;
 
@@ -579,6 +579,8 @@ const getRoleColor = (role: string, mode: ViewMode) => {
 
 function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete }: { parsed: any; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void }) {
   const [visibleCount, setVisibleCount] = useState(0);
+  const selectedBgId = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('chat_background') || '{}').id || 'none') : 'none';
+  const isDarkBg = ['rain', 'meadow', 'fireplace'].includes(selectedBgId);
 
   useEffect(() => {
     setVisibleCount(0);
@@ -615,7 +617,7 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
             <Sparkles className="w-5 h-5" style={{ color: themes[theme].accent }} />
           </div>
           <div className={`p-4 rounded-2xl max-w-[90%] ${themes[theme].cardBg} shadow-sm border border-black/5 rounded-tl-sm`}>
-            <div className="text-sm prose prose-slate max-w-none leading-relaxed text-slate-700">
+            <div className={`text-sm prose prose-slate ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed text-[var(--text-secondary)]`}>
               <ReactMarkdown>{parsed.intro}</ReactMarkdown>
             </div>
           </div>
@@ -663,7 +665,7 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
               >
                 {/* Accent line on the left inside the bubble */}
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: roleColor }} />
-                <div className="text-[14.5px] prose prose-sm max-w-none leading-relaxed text-slate-800 font-medium">
+                <div className={`text-[14.5px] prose prose-sm ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed text-[var(--text-primary)] font-medium`}>
                   <ReactMarkdown>{block.text}</ReactMarkdown>
                 </div>
               </div>
@@ -678,9 +680,9 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
       {/* 4. Outro/Summary Bubble */}
       {parsed.outro && visibleCount >= parsed.roles.length && (
         <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 justify-end pr-4">
-          <div className={`p-4 rounded-2xl bg-white/50 backdrop-blur-md border border-dashed border-slate-300 max-w-[80%] shadow-inner relative`}>
-            <div className="absolute -top-2 left-4 px-2 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">总结</div>
-            <div className="text-sm italic text-slate-500 leading-relaxed">
+          <div className={`p-4 rounded-2xl bg-[var(--bg-card)] backdrop-blur-md border border-dashed border-[var(--border-light)] max-w-[80%] shadow-inner relative`}>
+            <div className="absolute -top-2 left-4 px-2 bg-[var(--bg-page)] text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-tighter">总结</div>
+            <div className={`text-sm italic text-[var(--text-secondary)] leading-relaxed prose prose-sm ${isDarkBg ? 'prose-invert' : ''}`}>
               <ReactMarkdown>{parsed.outro}</ReactMarkdown>
             </div>
           </div>
@@ -720,7 +722,9 @@ export default function ChatApp() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
 
-  // Sync theme to CSS variables
+  // Sync theme and background to CSS variables
+  const isDarkBg = ['rain', 'meadow', 'fireplace'].includes(selectedBg.id);
+
   useEffect(() => {
     const root = document.documentElement;
     const theme = themes[selectedTheme];
@@ -728,14 +732,31 @@ export default function ChatApp() {
     root.style.setProperty('--bg-panel', theme.pageBg);
     root.style.setProperty('--accent-main', theme.accent);
 
-    // Determine if we need dark or light text based on theme name or common knowledge
-    // For now, all these themes are light-ish backgrounds with dark text
-    root.style.setProperty('--text-primary', '#1F2328');
-    root.style.setProperty('--text-secondary', '#4B5563');
+    // Sidebar colors (Always dark, regardless of background)
+    root.style.setProperty('--sidebar-text-primary', '#1F2328');
+    root.style.setProperty('--sidebar-text-secondary', '#4B5563');
+
+    // Dialogue/Main Area colors (Adaptable)
+    const textColorPrimary = isDarkBg ? '#F8FAFC' : '#1F2328';
+    const textColorSecondary = isDarkBg ? '#CBD5E1' : '#4B5563';
+    const textColorTertiary = isDarkBg ? '#94A3B8' : '#64748B';
+    const bubbleBotBg = isDarkBg ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)';
+    const cardBg = isDarkBg ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)';
+    const inputBg = isDarkBg ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)';
+
+    root.style.setProperty('--text-primary', textColorPrimary);
+    root.style.setProperty('--text-secondary', textColorSecondary);
+    root.style.setProperty('--text-tertiary', textColorTertiary);
+    root.style.setProperty('--bg-bubble-bot', bubbleBotBg);
+    root.style.setProperty('--bg-card', cardBg);
+    root.style.setProperty('--bg-input', inputBg);
 
     root.style.setProperty('--bg-hover', `${theme.accent}15`);
-    root.style.setProperty('--border-light', `${theme.accent}20`);
-  }, [selectedTheme]);
+    root.style.setProperty('--border-light', isDarkBg ? 'rgba(255,255,255,0.1)' : `${theme.accent}20`);
+
+    // Save background to localStorage for component use
+    localStorage.setItem('chat_background', JSON.stringify(selectedBg));
+  }, [selectedTheme, selectedBg, isDarkBg]);
 
   const fixedMode: ViewMode | null = pathname?.startsWith('/lysk')
     ? 'game'
@@ -1075,15 +1096,24 @@ export default function ChatApp() {
     const allowedSet = new Set(allowed);
     const lines = (text || '').split(/\r?\n/);
     const out: string[] = [];
+    let isCurrentSpeakerAllowed = false;
+
+    const allGameRolesPattern = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'].join('|');
+    const speakerRegex = new RegExp(`^\\s*(${allGameRolesPattern})：`);
+
     for (const line of lines) {
-      const m = line.match(/^\s*(沈星回|黎深|祁煜|夏以昼|秦彻)：/);
-      if (!m) {
-        // Keep non-speaker lines only if they follow an allowed speaker block already
-        if (out.length > 0) out.push(line);
-        continue;
+      const m = line.match(speakerRegex);
+      if (m) {
+        const speaker = m[1];
+        if (allowedSet.has(speaker)) {
+          isCurrentSpeakerAllowed = true;
+          out.push(line);
+        } else {
+          isCurrentSpeakerAllowed = false;
+        }
+      } else if (isCurrentSpeakerAllowed) {
+        out.push(line);
       }
-      const speaker = m[1];
-      if (allowedSet.has(speaker)) out.push(line);
     }
     return out.join('\n').trim();
   };
@@ -1682,7 +1712,7 @@ export default function ChatApp() {
       return;
     }
 
-    // 默认兜底逻辑
+    // Default兜底逻辑
     let textToSpeak = text;
     setTtsError(null);
     setTtsLoadingId(messageId);
@@ -1970,7 +2000,7 @@ export default function ChatApp() {
             <div className="pb-1">
               <button
                 onClick={() => setIsChatSubMenuOpen(!isChatSubMenuOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--text-primary)] mb-1"
+                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors group text-[var(--sidebar-text-primary)] mb-1"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5 flex items-center justify-center rounded-md bg-[var(--accent-main)]/10 text-[var(--accent-main)]">
@@ -1991,7 +2021,7 @@ export default function ChatApp() {
                     <Link
                       href="/mbti"
                       onClick={() => setIsMobileSidebarOpen(false)}
-                      className={`relative flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-all ml-7 ${pathname === '/mbti' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                      className={`relative flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-all ml-7 ${pathname === '/mbti' ? 'text-[var(--sidebar-text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--sidebar-text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--sidebar-text-primary)]'}`}
                     >
                       {pathname === '/mbti' && <motion.div layoutId="sidebar-active" className="absolute left-0 w-1 h-3 rounded-full bg-[var(--accent-main)]" />}
                       <span>MBTI 创作型</span>
@@ -1999,7 +2029,7 @@ export default function ChatApp() {
                     <Link
                       href="/lysk"
                       onClick={() => setIsMobileSidebarOpen(false)}
-                      className={`relative flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-all ml-7 ${pathname === '/lysk' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}`}
+                      className={`relative flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-all ml-7 ${pathname === '/lysk' ? 'text-[var(--sidebar-text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--sidebar-text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--sidebar-text-primary)]'}`}
                     >
                       {pathname === '/lysk' && <motion.div layoutId="sidebar-active" className="absolute left-0 w-1 h-3 rounded-full bg-[var(--accent-main)]" />}
                       <span>恋与深空同人</span>
@@ -2014,9 +2044,9 @@ export default function ChatApp() {
             <Link
               href="/blog"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/blog' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/blog' ? 'text-[var(--sidebar-text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--sidebar-text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/blog' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/blog' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--sidebar-text-secondary)] group-hover:text-[var(--sidebar-text-primary)]'}`}>
                 <LayoutGrid className="w-3.5 h-3.5" />
               </div>
               <span>博客广场</span>
@@ -2025,9 +2055,9 @@ export default function ChatApp() {
             <Link
               href="/blog"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/my-blogs' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/my-blogs' ? 'text-[var(--sidebar-text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--sidebar-text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/my-blogs' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/my-blogs' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--sidebar-text-secondary)] group-hover:text-[var(--sidebar-text-primary)]'}`}>
                 <PenTool className="w-3.5 h-3.5" />
               </div>
               <span>我的博客</span>
@@ -2036,9 +2066,9 @@ export default function ChatApp() {
             <Link
               href="/history"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/history' ? 'text-[var(--text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`relative w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-colors group ${pathname === '/history' ? 'text-[var(--sidebar-text-primary)] bg-[var(--bg-hover)]' : 'text-[var(--sidebar-text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
-              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/history' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+              <div className={`w-5 h-5 flex items-center justify-center rounded-md transition-colors ${pathname === '/history' ? 'bg-[var(--accent-main)]/10 text-[var(--accent-main)]' : 'bg-transparent text-[var(--sidebar-text-secondary)] group-hover:text-[var(--sidebar-text-primary)]'}`}>
                 <History className="w-3.5 h-3.5" />
               </div>
               <span>聊天历史</span>
@@ -2049,9 +2079,9 @@ export default function ChatApp() {
           <div className="px-3 py-4 space-y-1 border-t border-[var(--border-light)] bg-[var(--bg-page)]/50">
             <button
               onClick={() => setIsAppearanceDrawerOpen(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] group"
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--sidebar-text-secondary)] group"
             >
-              <div className="w-5 h-5 flex items-center justify-center rounded-md bg-transparent text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">
+              <div className="w-5 h-5 flex items-center justify-center rounded-md bg-transparent text-[var(--sidebar-text-secondary)] group-hover:text-[var(--sidebar-text-primary)]">
                 <Palette className="w-3.5 h-3.5" />
               </div>
               <span>视觉风格</span>
@@ -2237,7 +2267,7 @@ export default function ChatApp() {
                             </span>
                           )}
                           <div className={`p-3 md:p-4 relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
-                            <div className={`text-[15px] prose prose-sm max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>
+                            <div className={`text-[15px] prose prose-sm ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-[var(--text-primary)]'}`}>
                               <ReactMarkdown>{content}</ReactMarkdown>
                               {images.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mt-3">
