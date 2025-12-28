@@ -514,7 +514,7 @@ const getRoleStatusText = (role: string, mode: ViewMode) => {
       case 'ENTJ':
         return '祁煜一边检查装备一边抬眼打量战场，话不多，却已经在心里替你把所有退路都想好。';
       case 'ISTJ':
-        return '黎深安静地站在你身侧，目光细致地扫过每一个细节，用平稳的语气把风险和解决办法一条条说给你听。';
+        return '黎深虽然还在看手里的病例，但心思全在你身上，正无奈又宠溺地盘算着一会儿该怎么把你抓到怀里“管教”一番。';
       case 'ENFP':
         return '沈星回总能先发现好玩的角度，他一边和你聊天一边帮你拆解难题，让气氛一点点从紧绷变得明亮。';
       case 'INFP':
