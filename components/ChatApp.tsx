@@ -1817,7 +1817,7 @@ export default function ChatApp() {
                 selectedRolesQueueRef.current.push(Array.isArray(selectedRoles) ? [...selectedRoles] : []);
               }
               const contentForModel = withMetaBlocks(content);
-              sendMessageActive({ role: 'user', content: contentForModel } as any).catch(err => console.error('Auto-send failed:', err));
+              sendMessageActive({ role: 'user', content: contentForModel } as any).catch((err: any) => console.error('Auto-send failed:', err));
             }
           }, 2000);
         }
