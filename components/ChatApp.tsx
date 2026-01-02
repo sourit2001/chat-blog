@@ -6,7 +6,7 @@ import html2canvas from 'html2canvas';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
-  Download, Volume2, Loader2, Globe, LayoutGrid, Users, History,
+  Download, Volume2, Loader2, Globe, LayoutGrid, Users, History, ArrowRight,
   Settings, ChevronDown, ChevronRight, MessageCircle, PenTool, Palette,
   UserCircle, Plus, VolumeX, Image as ImageIcon, X, Camera, CheckSquare, Square
 } from "lucide-react";
@@ -580,45 +580,6 @@ export default function ChatApp() {
     }
   }, [fixedMode, viewMode]);
 
-  // Load the latest conversation when viewMode changes or on mount
-  useEffect(() => {
-    let active = true;
-    const restoreSession = async () => {
-      if (!supabaseClient) return;
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      if (!user) return;
-
-      // Find the LATEST conversation for this mode
-      const { data: found } = await supabaseClient
-        .from('conversations')
-        .select('id, messages(id, role, content)')
-        .eq('user_id', user.id)
-        .eq('view_mode', viewMode)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (active && found && found.length > 0) {
-        setConversationId(found[0].id);
-
-        // Restore messages too!
-        if (found[0].messages) {
-          const restored = found[0].messages.map((m: any) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content
-          }));
-          // Sort explicitly by ID or just trust returning order if handled
-          // But usually we need to ensure correct message order
-          // Here we just set conversationId, messages often loaded separately or we can set them
-          // Let's at least set conversationId so new messages append to it.
-        }
-      } else {
-        if (active) setConversationId(null);
-      }
-    };
-    restoreSession();
-    return () => { active = false; };
-  }, [viewMode]);
   // Game mode: selectable chat members (default all 5)
   // Mode-based selectable chat members
   const allGameRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] as const;
@@ -838,8 +799,81 @@ export default function ChatApp() {
   } as any);
   const messages = viewMode === 'mbti' ? chatMbti.messages : chatGame.messages;
   const status = viewMode === 'mbti' ? chatMbti.status : chatGame.status;
-  const setMessagesActive = viewMode === 'mbti' ? chatMbti.setMessages : chatGame.setMessages;
-  const sendMessageActive = viewMode === 'mbti' ? chatMbti.sendMessage : chatGame.sendMessage;
+  const setMessagesActive = viewMode === 'mbti' ? (chatMbti as any).setMessages : (chatGame as any).setMessages;
+  const sendMessageActive = viewMode === 'mbti' ? (chatMbti as any).append : (chatGame as any).append;
+
+  // Optimized Session Restoration: Fetch potential contexts (last 3 rounds)
+  const [historyContexts, setHistoryContexts] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchHistoryContexts = async () => {
+      try {
+        if (!supabaseClient) return;
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+        if (authError || !user) return;
+
+        const { data: found, error: findError } = await supabaseClient
+          .from('conversations')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('view_mode', viewMode)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (findError) return;
+
+        if (active && found && found.length > 0) {
+          const convId = found[0].id;
+          setConversationId(convId);
+
+          const { data: msgData, error: msgError } = await supabaseClient
+            .from('messages')
+            .select('id, role, content, created_at')
+            .eq('conversation_id', convId)
+            .order('created_at', { ascending: false })
+            .limit(6);
+
+          if (msgError) return;
+
+          if (active && msgData) {
+            // Group into pairs (rounds)
+            const reversed = [...msgData].reverse();
+            setHistoryContexts(reversed);
+          }
+        } else {
+          if (active) {
+            setConversationId(null);
+            setHistoryContexts([]);
+          }
+        }
+      } catch (err) {
+        // Silently ignore network errors during background fetch
+        console.warn('History fetch failed:', err);
+      }
+    };
+
+    if (messages.length === 0) {
+      fetchHistoryContexts();
+    }
+    return () => { active = false; };
+  }, [viewMode, messages.length === 0]);
+
+  const loadContextUpTo = (msgId: string) => {
+    const idx = historyContexts.findIndex(m => m.id === msgId);
+    if (idx === -1) return;
+
+    // We load everything from the start of our fetched window up to this message
+    const restored = historyContexts.slice(0, idx + 1).map((m: any) => ({
+      id: m.id,
+      role: m.role as any,
+      content: m.content,
+      parts: [{ type: 'text' as const, text: m.content }]
+    }));
+
+    setMessagesActive(restored);
+    setHistoryContexts([]); // Clear picker after selection
+  };
 
   const [isRecording, setIsRecording] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -930,6 +964,7 @@ export default function ChatApp() {
 
   const ROLES_BLOCK_REGEX = /\[\[\[SELECTED_ROLES\]\]\][\s\S]*?\[\[\[\/SELECTED_ROLES\]\]\]/g;
   const stripRolesBlock = (text: string) => (text || '').replace(ROLES_BLOCK_REGEX, '').trim();
+  const stripMarkdownImages = (text: string) => (text || '').replace(/!\[.*?\]\(.*?\)/g, '').trim();
   const withRolesBlock = (text: string) => {
     const plain = stripRolesBlock(text || '');
     if (viewMode !== 'game') return plain;
@@ -1005,7 +1040,7 @@ export default function ChatApp() {
       // Fallback for messages with parts but no content (e.g. from sendMessage with parts)
       text = message.parts.map((p: any) => p.text || '').join('');
     }
-    const cleaned = stripRolesBlock(stripPersonaBlock(text));
+    const cleaned = stripMarkdownImages(stripRolesBlock(stripPersonaBlock(text)));
     // Only enforce selectedRoles filtering on assistant replies.
     // User messages should always display (just strip hidden meta blocks).
     if (message?.role === 'assistant') {
@@ -1018,16 +1053,32 @@ export default function ChatApp() {
 
   const getMessageImages = (message: any) => {
     let images: string[] = [];
+
+    // 1. Extract from content array (structured)
     if (Array.isArray(message.content)) {
       images = message.content.filter((p: any) => p.type === 'image' || p.image).map((p: any) => p.image || p.data);
-    } else if (message.parts && Array.isArray(message.parts)) {
+    }
+    // 2. Extract from parts (AI SDK fallback)
+    else if (message.parts && Array.isArray(message.parts)) {
       images = message.parts.filter((p: any) => p.type === 'image' || p.image).map((p: any) => p.image || p.data);
     }
+
+    // 3. Extract from attachments object
     const atts = message.experimental_attachments || message.attachments;
     if (Array.isArray(atts)) {
       const attImages = atts.filter((a: any) => a.contentType?.startsWith('image/') || a.url?.startsWith('data:image/')).map((a: any) => a.url);
       images = [...images, ...attImages];
     }
+
+    // 4. Extract from markdown string (![alt](url))
+    if (images.length === 0 && typeof message.content === 'string') {
+      const markdownImageRegex = /!\[.*?\]\((.*?)\)/g;
+      let match;
+      while ((match = markdownImageRegex.exec(message.content)) !== null) {
+        if (match[1]) images.push(match[1]);
+      }
+    }
+
     return images.filter(Boolean);
   };
 
@@ -1109,51 +1160,56 @@ export default function ChatApp() {
     if (conversationPromiseRef.current) return conversationPromiseRef.current;
 
     const createOrFind = async (): Promise<string | null> => {
-      if (!supabaseClient) return null;
-      const client = supabaseClient;
-      const { data: { user } } = await client.auth.getUser();
-      if (!user) return null;
+      try {
+        if (!supabaseClient) return null;
+        const client = supabaseClient;
+        const { data: { user }, error: authError } = await client.auth.getUser();
+        if (authError || !user) return null;
 
-      // Reuse the latest conversation for this viewMode, regardless of when it was created
-      /* 
-         Change: Removed the 1-hour time limit. 
-         Reason: User wants to continue the same historical session (e.g., "MBTI Team Chat") indefinitely 
-                 unless explicitly cleared, rather than creating new fragments every hour.
-      */
-      const { data: found } = await client
-        .from('conversations')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('view_mode', viewMode)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        // Reuse the latest conversation for this viewMode, regardless of when it was created
+        /* 
+           Change: Removed the 1-hour time limit. 
+           Reason: User wants to continue the same historical session (e.g., "MBTI Team Chat") indefinitely 
+                   unless explicitly cleared, rather than creating new fragments every hour.
+        */
+        const { data: found } = await client
+          .from('conversations')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('view_mode', viewMode)
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-      if (found && found.length > 0) {
-        // If we found an existing conversation, reuse it!
-        setConversationId(found[0].id);
-        return found[0].id as string;
+        if (found && found.length > 0) {
+          // If we found an existing conversation, reuse it!
+          setConversationId(found[0].id);
+          return found[0].id as string;
+        }
+
+        const cleanTitle = (initialTitle || '')
+          .replace(/\[\[\[[\s\S]*?\]\]\]/g, '')
+          .trim();
+
+        const title = cleanTitle
+          ? (cleanTitle.slice(0, 50) + (cleanTitle.length > 50 ? '...' : ''))
+          : (viewMode === 'game' ? '恋与深空会话' : 'MBTI 团队会话');
+
+        const { data: created, error } = await client
+          .from('conversations')
+          .insert({ user_id: user.id, title, view_mode: viewMode })
+          .select('id')
+          .single();
+
+        if (error) {
+          console.error('Failed to create conversation:', error);
+          return null;
+        }
+        setConversationId(created.id);
+        return created.id as string;
+      } catch (err: any) {
+        console.warn('Conversation find/create failed:', err);
+        return null; // Return null on network failure
       }
-
-      const cleanTitle = (initialTitle || '')
-        .replace(/\[\[\[[\s\S]*?\]\]\]/g, '')
-        .trim();
-
-      const title = cleanTitle
-        ? (cleanTitle.slice(0, 50) + (cleanTitle.length > 50 ? '...' : ''))
-        : (viewMode === 'game' ? '恋与深空会话' : 'MBTI 团队会话');
-
-      const { data: created, error } = await client
-        .from('conversations')
-        .insert({ user_id: user.id, title, view_mode: viewMode })
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Failed to create conversation:', error);
-        return null;
-      }
-      setConversationId(created.id);
-      return created.id as string;
     };
 
     conversationPromiseRef.current = createOrFind();
@@ -1641,8 +1697,15 @@ export default function ChatApp() {
     setAttachedFiles([]); // Clear attachments
 
     try {
+      // Calculate effective roles to ensure frontend filtering matches backend generation
+      const defaultGameRoles = ['祁煜', '黎深', '沈星回', '夏以昼', '秦彻'];
+      const defaultMbtiRoles = ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ'];
+      const effectiveRoles = selectedRoles.length > 0
+        ? selectedRoles
+        : (viewMode === 'game' ? defaultGameRoles : defaultMbtiRoles);
+
       if (viewMode === 'game') {
-        selectedRolesQueueRef.current.push(Array.isArray(selectedRoles) ? [...selectedRoles] : []);
+        selectedRolesQueueRef.current.push([...effectiveRoles]);
       }
       const contentForModel = withMetaBlocks(content);
 
@@ -1672,12 +1735,21 @@ export default function ChatApp() {
             url: base64,
           };
         }));
+      }
 
-        await sendMessageActive({
+      // Use the active chat instance directly to avoid closure issues
+      // Use the active chat instance directly to avoid closure issues
+      const activeChat = viewMode === 'mbti' ? chatMbti : chatGame;
+
+      // Compatibility: use append (newer SDK) or sendMessage (older/custom)
+      const sendFunc = (activeChat as any).append || (activeChat as any).sendMessage;
+
+      if (typeof sendFunc === 'function') {
+        await sendFunc({
           role: 'user',
           content: contentForModel,
           experimental_attachments: attachments as any
-        } as any, {
+        }, {
           body: {
             viewMode,
             selectedRoles: selectedRoles.length > 0 ? selectedRoles : (viewMode === 'game' ? ['祁煜', '黎深', '沈星回', '夏以昼', '秦彻'] : ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ']),
@@ -1685,16 +1757,7 @@ export default function ChatApp() {
           }
         });
       } else {
-        await sendMessageActive({
-          role: 'user',
-          content: contentForModel
-        } as any, {
-          body: {
-            viewMode,
-            selectedRoles: selectedRoles.length > 0 ? selectedRoles : (viewMode === 'game' ? ['祁煜', '黎深', '沈星回', '夏以昼', '秦彻'] : ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ']),
-            userProfile
-          }
-        });
+        console.error('No send function found on chat object', activeChat);
       }
 
       // store user message (append image markdown if attachments exist)
@@ -2168,10 +2231,61 @@ export default function ChatApp() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col items-center py-20 text-center"
+                className="flex flex-col items-center py-10 md:py-20 text-center"
               >
-                <h2 className="text-2xl font-black text-[var(--text-primary)] mb-2 tracking-tight mt-10">开启一段对话</h2>
-                <p className="text-[var(--text-secondary)] text-sm max-w-sm">在这里记录灵感，通过对话生成触动人心的博客文章。</p>
+                <div className="w-16 h-16 rounded-3xl bg-[var(--accent-main)]/10 flex items-center justify-center mb-6">
+                  <Sparkles className="w-8 h-8 text-[var(--accent-main)]" />
+                </div>
+                <h2 className="text-2xl font-black text-[var(--text-primary)] mb-2 tracking-tight">开启一段对话</h2>
+                <p className="text-[var(--text-secondary)] text-sm max-w-sm mb-10">在这里记录灵感，通过对话生成触动人心的博客文章。</p>
+
+                {historyContexts.length > 0 && (
+                  <div className="w-full max-w-md space-y-4">
+                    <div className="flex items-center gap-2 px-2">
+                      <History className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">接续最近的对话进度</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {historyContexts.filter(m => m.role === 'user').slice(-3).map((m, idx) => {
+                        const previewImages = getMessageImages({ content: m.content });
+                        return (
+                          <button
+                            key={m.id}
+                            onClick={() => loadContextUpTo(m.id)}
+                            className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white/40 hover:bg-white/70 backdrop-blur-xl border border-white/40 hover:border-[var(--accent-main)]/30 shadow-sm transition-all text-left overflow-hidden active:scale-[0.98]"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-[9px] font-black text-[var(--accent-main)] uppercase tracking-tighter opacity-60">
+                                  {idx === 2 ? '最后一次' : `前 ${2 - idx} 轮`}
+                                </span>
+                              </div>
+                              <div className="text-[13px] font-bold text-slate-700 line-clamp-2 leading-snug">
+                                {stripMarkdownImages(getMessageContent({ content: m.content, role: 'user' }))}
+                              </div>
+                            </div>
+
+                            {previewImages.length > 0 && (
+                              <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-white/50 bg-slate-100/50">
+                                <img src={previewImages[0]} alt="预览" className="w-full h-full object-cover" />
+                              </div>
+                            )}
+
+                            <div className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ArrowRight className="w-4 h-4 text-[var(--accent-main)]" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setHistoryContexts([])}
+                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest"
+                    >
+                      从头开始新话题
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -2219,14 +2333,17 @@ export default function ChatApp() {
                           )}
                           <div className={`p-3 md:p-4 relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
                             <div className={`${fontSize === 'xlarge' ? 'text-[20px]' : fontSize === 'large' ? 'text-[17px]' : 'text-[15px]'} prose prose-sm ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-[var(--text-primary)]'}`}>
-                              <ReactMarkdown>{content}</ReactMarkdown>
+                              <ReactMarkdown components={{ img: ({ src, ...props }) => src ? <img src={src} {...props} loading="lazy" /> : null }}>
+                                {content}
+                              </ReactMarkdown>
                               {images.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mt-3">
                                   {images.map((img, idx) => (
                                     <div key={idx} className="relative group">
                                       <img
-                                        src={img}
+                                        src={img || undefined}
                                         alt="uploaded"
+                                        loading="lazy"
                                         className="max-w-[240px] max-h-[320px] rounded-xl border border-white/20 shadow-md object-cover"
                                       />
                                     </div>
@@ -3016,7 +3133,9 @@ export default function ChatApp() {
                                 className={`text-[14px] max-w-none leading-relaxed ${m.role === 'user' ? 'font-medium' : ''}`}
                                 style={{ color: m.role === 'user' ? '#ffffff' : '#334155' }}
                               >
-                                <ReactMarkdown>{content}</ReactMarkdown>
+                                <ReactMarkdown components={{ img: ({ src, ...props }) => src ? <img src={src} {...props} /> : null }}>
+                                  {content}
+                                </ReactMarkdown>
                                 {images.length > 0 && (
                                   <div className="flex flex-wrap gap-2 mt-3">
                                     {images.map((img, idx) => (
