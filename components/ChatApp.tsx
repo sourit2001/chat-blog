@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import html2canvas from 'html2canvas';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Mic, Send, Menu, Sparkles, StopCircle, Copy, Trash2, Check, FileText,
@@ -577,17 +578,19 @@ const getRoleColor = (role: string, mode: ViewMode) => {
   return group?.color || '#94a3b8';
 };
 
-function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete }: { parsed: any; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void }) {
+function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete, forceShowAll }: { parsed: any; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void; forceShowAll?: boolean }) {
   const [visibleCount, setVisibleCount] = useState(0);
   const selectedBgId = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('chat_background') || '{}').id || 'none') : 'none';
   const isDarkBg = ['rain', 'meadow', 'fireplace'].includes(selectedBgId);
 
   useEffect(() => {
-    setVisibleCount(0);
-  }, [messageId]);
+    if (!forceShowAll) {
+      setVisibleCount(0);
+    }
+  }, [messageId, forceShowAll]);
 
   useEffect(() => {
-    if (parsed.roles.length === 0) return;
+    if (forceShowAll || parsed.roles.length === 0) return;
     if (visibleCount >= parsed.roles.length) return;
 
     const interval = setInterval(() => {
@@ -596,7 +599,8 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
     return () => clearInterval(interval);
   }, [parsed.roles.length, visibleCount]);
 
-  const visibleRoles = parsed.roles.slice(0, visibleCount || 1);
+  const effectiveVisibleCount = forceShowAll ? parsed.roles.length : (visibleCount || 1);
+  const visibleRoles = parsed.roles.slice(0, effectiveVisibleCount);
   const spokenRoles = new Set(parsed.roles.map((r: any) => r.role));
 
   const allowedSlots = (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0)
@@ -613,11 +617,20 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
       {/* 1. Intro Bubble (AI System/Narration) */}
       {parsed.intro && (
         <div className="flex gap-3">
-          <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-white/40 backdrop-blur-md shadow-sm border border-white/50">
+          <div
+            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1"
+            style={{ backgroundColor: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.5)', backdropFilter: forceShowAll ? 'none' : 'blur(10px)' }}
+          >
             <Sparkles className="w-5 h-5" style={{ color: themes[theme].accent }} />
           </div>
-          <div className={`p-4 rounded-2xl max-w-[90%] ${themes[theme].cardBg} shadow-sm border border-black/5 rounded-tl-sm`}>
-            <div className={`text-sm prose prose-slate ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed text-[var(--text-secondary)]`}>
+          <div
+            className={`p-4 rounded-2xl max-w-[90%] shadow-sm rounded-tl-sm`}
+            style={{ backgroundColor: forceShowAll ? '#ffffff' : (isDarkBg ? 'rgba(255,255,255,0.05)' : '#ffffff'), border: '1px solid rgba(0,0,0,0.05)' }}
+          >
+            <div
+              className={`text-sm max-w-none leading-relaxed`}
+              style={{ color: isDarkBg ? '#cbd5e1' : '#475569' }}
+            >
               <ReactMarkdown>{parsed.intro}</ReactMarkdown>
             </div>
           </div>
@@ -628,9 +641,7 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
       {visibleRoles.map((block: any, idx: number) => {
         const roleColor = getRoleColor(block.role, viewMode);
         return (
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
+          <div
             key={`${messageId}-${block.role}-${idx}`}
             className="flex gap-3"
           >
@@ -652,41 +663,52 @@ function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDe
                 <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: roleColor }}>
                   {getRoleLabel(block.role, viewMode)}
                 </span>
-                <div className="h-[1px] flex-1 bg-gradient-to-r from-slate-200 to-transparent opacity-50" />
+                <div className="h-[1px] flex-1" style={{ backgroundColor: '#e2e8f0' }} />
               </div>
 
               <div
-                className={`p-4 rounded-2xl shadow-sm relative overflow-hidden backdrop-blur-sm transition-colors`}
+                className={`p-4 rounded-2xl shadow-sm relative overflow-hidden ${forceShowAll ? '' : 'backdrop-blur-sm'} transition-colors`}
                 style={{
-                  backgroundColor: `${roleColor}08`, // 还原为极淡背景 (~3%)
-                  borderColor: `${roleColor}15`,     // 还原为淡边框
+                  backgroundColor: forceShowAll ? '#f8fafc' : `${roleColor}08`,
+                  borderColor: forceShowAll ? '#e2e8f0' : `${roleColor}15`,
                   borderWidth: '1px'
                 }}
               >
                 {/* Accent line on the left inside the bubble */}
                 <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: roleColor }} />
-                <div className={`text-[14.5px] prose prose-sm ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed text-[var(--text-primary)] font-medium`}>
+                <div
+                  className={`text-[14.5px] max-w-none leading-relaxed font-medium`}
+                  style={{ color: isDarkBg ? '#f8fafc' : '#1e293b' }}
+                >
                   <ReactMarkdown>{block.text}</ReactMarkdown>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         );
       })}
 
       {/* 3. Silent/Status Info (Compact) */}
 
 
-      {/* 4. Outro/Summary Bubble */}
-      {parsed.outro && visibleCount >= parsed.roles.length && (
-        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 justify-end pr-4">
-          <div className={`p-4 rounded-2xl bg-[var(--bg-card)] backdrop-blur-md border border-dashed border-[var(--border-light)] max-w-[80%] shadow-inner relative`}>
-            <div className="absolute -top-2 left-4 px-2 bg-[var(--bg-page)] text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-tighter">总结</div>
-            <div className={`text-sm italic text-[var(--text-secondary)] leading-relaxed prose prose-sm ${isDarkBg ? 'prose-invert' : ''}`}>
+      {parsed.outro && (forceShowAll || visibleCount >= parsed.roles.length) && (
+        <div className="flex gap-3 justify-end pr-4">
+          <div
+            className={`p-4 rounded-2xl border border-dashed max-w-[80%] shadow-inner relative`}
+            style={{ backgroundColor: forceShowAll ? '#f8fafc' : (isDarkBg ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.3)'), borderColor: '#e2e8f0' }}
+          >
+            <div
+              className={`absolute -top-2 left-4 px-2 text-[10px] font-bold uppercase tracking-tighter`}
+              style={{ backgroundColor: forceShowAll ? '#ffffff' : '#f8fafc', color: '#94a3b8' }}
+            >总结</div>
+            <div
+              className={`text-sm italic leading-relaxed`}
+              style={{ color: isDarkBg ? '#94a3b8' : '#64748b' }}
+            >
               <ReactMarkdown>{parsed.outro}</ReactMarkdown>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Recall Button */}
@@ -707,6 +729,11 @@ export default function ChatApp() {
   const pathname = usePathname();
   const isRootPath = pathname === '/';
   const [viewMode, setViewMode] = useState<ViewMode>('mbti');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // --- UI Layout States ---
   const [isPersonaDrawerOpen, setIsPersonaDrawerOpen] = useState(false);
@@ -721,6 +748,8 @@ export default function ChatApp() {
   const [isBlogDraftVisible, setIsBlogDraftVisible] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const captureRef = useRef<HTMLDivElement>(null);
+  const [isExportingImage, setIsExportingImage] = useState(false);
 
   // Sync theme and background to CSS variables
   const isDarkBg = ['rain', 'meadow', 'fireplace'].includes(selectedBg.id);
@@ -1962,6 +1991,52 @@ export default function ChatApp() {
     }
   };
 
+  const handleDownloadImage = async () => {
+    if (selectedMessageIds.size === 0) {
+      alert('请先选择要生成的聊天内容');
+      return;
+    }
+
+    try {
+      setIsExportingImage(true);
+      // Wait for React to render the hidden capture area with the selected messages
+      await new Promise(r => setTimeout(r, 800));
+
+      if (!captureRef.current) {
+        throw new Error('Capture area not found');
+      }
+
+      // Ensure all images inside are loaded
+      const images = captureRef.current.querySelectorAll('img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      });
+      await Promise.all(imagePromises);
+
+      const canvas = await html2canvas(captureRef.current, {
+        useCORS: true,
+        scale: 2,
+        backgroundColor: isDarkBg ? '#0f172a' : '#ffffff',
+        logging: false,
+      });
+
+      const image = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `chat-export-${new Date().getTime()}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Failed to generate image:', error);
+      alert('生成图片失败，请重试');
+    } finally {
+      setIsExportingImage(false);
+    }
+  };
+
   return (
     <div
       className={`relative flex h-[100dvh] w-full overflow-hidden font-sans ${themes[selectedTheme].text}`}
@@ -2537,6 +2612,16 @@ export default function ChatApp() {
                   >
                     <CheckSquare className="w-3.5 h-3.5" />
                   </button>
+                  {isSelectionMode && (
+                    <button
+                      onClick={handleDownloadImage}
+                      disabled={isExportingImage || selectedMessageIds.size === 0}
+                      className="p-1 rounded text-[var(--accent-main)] hover:bg-white/50 transition-colors disabled:opacity-50"
+                      title="生成图片并下载"
+                    >
+                      {isExportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                   <div className="w-px h-3 bg-slate-200 mx-0.5" />
                   <Palette className="w-3 h-3 text-slate-400 ml-1" />
                   <select
@@ -2956,6 +3041,124 @@ export default function ChatApp() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Hidden Capture Area for Image Export */}
+      {isMounted && (
+        <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
+          <div
+            ref={captureRef}
+            className={`p-10 w-[600px] flex flex-col gap-6 ${isDarkBg ? 'bg-[#0f172a]' : 'bg-white'}`}
+            style={{
+              backgroundColor: isDarkBg ? '#0f172a' : (themes[selectedTheme].bg.match(/\[(.*?)\]/)?.[1] || '#ffffff'),
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.05)' }}
+                >
+                  <Sparkles className="w-6 h-6" style={{ color: themes[selectedTheme].accent }} />
+                </div>
+                <div>
+                  <div className="text-sm font-black tracking-tight" style={{ color: isDarkBg ? '#ffffff' : '#1f2937' }}>
+                    智聊室 · Chat Blog
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: isDarkBg ? '#cbd5e1' : '#64748b', opacity: 0.6 }}>
+                    Creative Co-Creation
+                  </div>
+                </div>
+              </div>
+              <div className="text-[10px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000', opacity: 0.4 }}>
+                {new Date().toLocaleDateString()}
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="space-y-8">
+              {messages
+                .filter((m: any) => selectedMessageIds.has(m.id))
+                .map((m: any) => {
+                  const content = getMessageContent(m);
+                  const images = getMessageImages(m);
+                  const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
+                  const hasRoles = parsed && parsed.roles.length > 0;
+
+                  if (m.role !== 'assistant' || !hasRoles) {
+                    return (
+                      <div key={`export-${m.id}`} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                        <div
+                          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1"
+                          style={{
+                            backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
+                            color: m.role === 'user' ? '#ffffff' : themes[selectedTheme].accent,
+                            border: '1px solid rgba(255,255,255,0.3)'
+                          }}
+                        >
+                          {m.role === 'user' ? (
+                            <div className="text-[9px] font-black uppercase">You</div>
+                          ) : (
+                            <Sparkles className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                          <div
+                            className={`p-4 rounded-2xl ${m.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm shadow-sm'}`}
+                            style={{
+                              backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
+                              border: m.role === 'user' ? 'none' : '1px solid #f1f5f9',
+                            }}
+                          >
+                            <div
+                              className={`text-[14px] max-w-none leading-relaxed ${m.role === 'user' ? 'font-medium' : ''}`}
+                              style={{ color: m.role === 'user' ? '#ffffff' : '#334155' }}
+                            >
+                              <ReactMarkdown>{content}</ReactMarkdown>
+                              {images.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  {images.map((img, idx) => (
+                                    <img key={idx} src={img} alt="" className="max-w-full rounded-xl shadow-sm" style={{ border: '1px solid rgba(255,255,255,0.2)' }} />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={`export-${m.id}`}>
+                      <MbtiReply
+                        parsed={parsed!}
+                        messageId={`export-${m.id}`}
+                        theme={selectedTheme}
+                        viewMode={viewMode}
+                        forceShowAll={true}
+                        selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
+                      />
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Footer */}
+            <div
+              className="mt-8 pt-6 flex justify-between items-center"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.1)', opacity: 0.4 }}
+            >
+              <div className="text-[9px] font-bold tracking-widest uppercase" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
+                Shared from Chat Blog App
+              </div>
+              <div className="text-[9px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
+                {new Date().toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 }
