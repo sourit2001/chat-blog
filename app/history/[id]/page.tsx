@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -88,7 +88,7 @@ export default function ConversationDetailPage() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [nickname, setNickname] = useState('');
   const [isExportingImage, setIsExportingImage] = useState(false);
-  const captureRef = useRef<HTMLDivElement>(null);
+  const captureRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -533,10 +533,11 @@ export default function ConversationDetailPage() {
                           messageId={pair.assistant.id}
                           viewMode={viewMode}
                           accentColor="#F59E0B"
+                          audioRecords={pair.assistant.audio_records}
                         />
                       )}
 
-                      {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
+                      {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && !hasRoles && (
                         <div className="mt-4 px-12 space-y-2">
                           {pair.assistant.audio_records.map((audio: any) => (
                             <div key={audio.id} className="flex flex-col gap-1">
@@ -780,6 +781,7 @@ export default function ConversationDetailPage() {
                       messageId={`export-${m.id}`}
                       viewMode={viewMode}
                       forceShowAll={true}
+                      audioRecords={m.audio_records}
                     />
                   </div>
                 );

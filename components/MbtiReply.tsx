@@ -14,13 +14,14 @@ import {
 interface MbtiReplyProps {
     parsed: any;
     messageId: string;
-    theme?: any; // We'll pass the theme object directly or just relevant colors
+    theme?: any;
     viewMode: 'mbti' | 'game';
     selectedGameRoles?: string[];
     onDelete?: (id: string) => void;
     forceShowAll?: boolean;
     isDarkBg?: boolean;
     accentColor?: string;
+    audioRecords?: any[];
 }
 
 export function MbtiReply({
@@ -31,7 +32,8 @@ export function MbtiReply({
     onDelete,
     forceShowAll = false,
     isDarkBg = false,
-    accentColor = "#F59E0B"
+    accentColor = "#F59E0B",
+    audioRecords = []
 }: MbtiReplyProps) {
     const [visibleCount, setVisibleCount] = useState(forceShowAll ? parsed.roles.length : 0);
 
@@ -54,6 +56,11 @@ export function MbtiReply({
     const effectiveVisibleCount = forceShowAll ? parsed.roles.length : (visibleCount || 1);
     const visibleRoles = parsed.roles.slice(0, effectiveVisibleCount);
     const spokenRoles = new Set(parsed.roles.map((r: any) => r.role));
+
+    // Filter and sort audio records for consistent indexing
+    const ttsAudio = (audioRecords || [])
+        .filter(a => a.type === 'tts')
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
     const allowedSlots = (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0)
         ? selectedGameRoles
@@ -142,6 +149,11 @@ export function MbtiReply({
                                 >
                                     <ReactMarkdown>{block.text}</ReactMarkdown>
                                 </div>
+                                {ttsAudio[idx] && (
+                                    <div className="mt-3 pt-2 border-t border-dashed border-slate-200/50">
+                                        <audio controls src={ttsAudio[idx].url} className="h-6 w-full max-w-[200px] opacity-40 hover:opacity-100 transition-opacity" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -171,6 +183,11 @@ export function MbtiReply({
                         >
                             <ReactMarkdown>{parsed.outro}</ReactMarkdown>
                         </div>
+                        {ttsAudio[parsed.roles.length] && (
+                            <div className="mt-2 text-right">
+                                <audio controls src={ttsAudio[parsed.roles.length].url} className="h-6 w-full max-w-[200px] opacity-40 hover:opacity-100 transition-opacity ml-auto" />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

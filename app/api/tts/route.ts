@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { google } from "@ai-sdk/google";
-import { generateText } from "ai";
+import { streamText, generateText } from "ai";
+import { createClient } from "@supabase/supabase-js";
 
 const REPLICATE_VERSION = "43b17801b02267d0baf70071ff440358f75499f20ad5c51118a2fdad14ba9b8c";
 
@@ -151,7 +152,47 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return new Response(JSON.stringify({ audioUrl }), {
+    // --- 新增：将音频持久化到 Supabase Storage ---
+    let finalAudioUrl = audioUrl;
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (supabaseUrl && supabaseKey) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // 1. 下载音频
+        const audioRes = await fetch(audioUrl);
+        const audioBuffer = await audioRes.arrayBuffer();
+
+        // 2. 准备文件名 (使用唯一标识)
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.mp3`;
+
+        // 3. 上传到 'audio' bucket
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('audio')
+          .upload(fileName, audioBuffer, {
+            contentType: 'audio/mpeg',
+            cacheControl: '31536000',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error("Supabase Storage upload error:", uploadError);
+        } else if (uploadData) {
+          // 4. 获取公开 URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('audio')
+            .getPublicUrl(fileName);
+          finalAudioUrl = publicUrl;
+          console.log("Audio persisted to Supabase:", finalAudioUrl);
+        }
+      }
+    } catch (persistError) {
+      console.warn("Failed to persist audio to Supabase, falling back to Replicate URL:", persistError);
+    }
+
+    return new Response(JSON.stringify({ audioUrl: finalAudioUrl }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
