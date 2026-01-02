@@ -18,6 +18,16 @@ import { Logo } from "@/components/Logo";
 import Link from 'next/link';
 import { UserStatus } from '@/components/UserStatus';
 import { prepareMessagesForBlog, restoreBlogImages } from '@/utils/blogUtils';
+import { MbtiReply } from "@/components/MbtiReply";
+import {
+  allMbtiRoles,
+  mbtiGroups,
+  parseMbtiGroupReply,
+  getRoleEmoji,
+  getRoleLabel,
+  getRoleAvatar,
+  getRoleColor
+} from '@/utils/mbtiUtils';
 
 type ParsedMbtiReply = {
   intro: string;
@@ -27,19 +37,8 @@ type ParsedMbtiReply = {
 type ViewMode = 'mbti' | 'game';
 type InteractionMode = 'text' | 'voice';
 
-const allMbtiRoles = [
-  "INTJ", "INTP", "ENTJ", "ENTP", // 紫人 (Analysts)
-  "INFJ", "INFP", "ENFJ", "ENFP", // 绿人 (Diplomats)
-  "ISTJ", "ISFJ", "ESTJ", "ESFJ", // 蓝人 (Sentinels)
-  "ISTP", "ISFP", "ESTP", "ESFP"  // 黄人 (Explorers)
-] as const;
+// Utility constants removed, now imported from @/utils/mbtiUtils.ts
 
-const mbtiGroups = [
-  { name: '分析家', color: '#A855F7', roles: ["INTJ", "INTP", "ENTJ", "ENTP"] }, // 紫色
-  { name: '外交官', color: '#22C55E', roles: ["INFJ", "INFP", "ENFJ", "ENFP"] }, // 绿色
-  { name: '守护者', color: '#3B82F6', roles: ["ISTJ", "ISFJ", "ESTJ", "ESFJ"] }, // 蓝色
-  { name: '探险家', color: '#EAB308', roles: ["ISTP", "ISFP", "ESTP", "ESFP"] }  // 黄色
-];
 
 const themes = {
   emerald: {
@@ -427,82 +426,8 @@ const FireplaceBackground = () => (
   </div>
 );
 
-const getRoleEmoji = (role: string, mode: ViewMode) => {
-  if (mode === 'game') {
-    // 游戏小队视角：将 MBTI 槽位映射为《恋与深空》五位男主
-    switch (role) {
-      case 'ENTJ':
-        return '\ud83d\udd25'; // 祁煜：火系、行动力强
-      case 'ISTJ':
-        return '\ud83e\ude7a'; // 黎深：医生、温柔克制
-      case 'ENFP':
-        return '\u2600\ufe0f'; // 沈星回：明亮、阳光少年
-      case 'INFP':
-        return '\ud83c\udfa8'; // 夏以昼：艺术气息、温柔细腻
-      case 'ENFJ':
-        return '\ud83c\udf11'; // 秦彻：危险感与守护并存
-      default:
-        return '\ud83c\udfae';
-    }
-  }
+// Utility functions removed, now imported from @/utils/mbtiUtils.ts
 
-  switch (role) {
-    // 分析家
-    case 'INTJ': return '♟️';
-    case 'INTP': return '🧪';
-    case 'ENTJ': return '🧠';
-    case 'ENTP': return '🧨';
-    // 外交官
-    case 'INFJ': return '🔮';
-    case 'INFP': return '🌿';
-    case 'ENFJ': return '😊';
-    case 'ENFP': return '🌟';
-    // 守护者
-    case 'ISTJ': return '📋';
-    case 'ISFJ': return '🛡️';
-    case 'ESTJ': return '📢';
-    case 'ESFJ': return '🤝';
-    // 探险家
-    case 'ISTP': return '🛠️';
-    case 'ISFP': return '🎨';
-    case 'ESTP': return '⚡';
-    case 'ESFP': return '🎉';
-    default: return '💬';
-  }
-};
-
-const getRoleLabel = (role: string, mode: ViewMode) => {
-  if (mode === 'mbti') return role;
-
-  // For game mode, we might get the MBTI code or the Chinese name
-  const mapping: Record<string, string> = {
-    'ENTJ': '祁煜',
-    'ISTJ': '黎深',
-    'ENFP': '沈星回',
-    'INFP': '夏以昼',
-    'ENFJ': '秦彻',
-    '祁煜': '祁煜',
-    '黎深': '黎深',
-    '沈星回': '沈星回',
-    '夏以昼': '夏以昼',
-    '秦彻': '秦彻'
-  };
-  return mapping[role] || role;
-};
-
-const getRoleAvatar = (role: string, mode: ViewMode) => {
-  if (mode === 'game') {
-    switch (role) {
-      case 'ENTJ': case '祁煜': return '/mbti/avatars/祁煜.jpg';
-      case 'ISTJ': case '黎深': return '/mbti/avatars/黎深.jpg';
-      case 'ENFP': case '沈星回': return '/mbti/avatars/沈星回.jpg';
-      case 'INFP': case '夏以昼': return '/mbti/avatars/夏以昼.jpg';
-      case 'ENFJ': case '秦彻': return '/mbti/avatars/秦彻.jpg';
-      default: return null;
-    }
-  }
-  return null;
-};
 
 const getRoleAvatarClass = (role: string, mode: ViewMode) => {
   // Use subtle, consistent colors instead of vibrant gradients
@@ -557,172 +482,13 @@ const getRoleStatusText = (role: string, mode: ViewMode) => {
   }
 };
 
-const gameRoleColors: Record<string, string> = {
-  '沈星回': '#c084fc', // 淡紫色
-  '黎深': '#60a5fa',   // 蓝色
-  '秦彻': '#f87171',   // 红色
-  '祁煜': '#f472b6',   // 粉色
-  '夏以昼': '#fb923c', // 橙色
+const getRoleColorLocal = (role: string, mode: ViewMode) => {
+  return getRoleColor(role, mode);
 };
 
-const getRoleColor = (role: string, mode: ViewMode) => {
-  // 优先匹配游戏角色名，防止 viewMode 状态不一致导致颜色丢失
-  if (gameRoleColors[role]) {
-    return gameRoleColors[role];
-  }
 
-  if (mode === 'game') {
-    return gameRoleColors[role] || '#94a3b8';
-  }
-  const group = mbtiGroups.find(g => g.roles.includes(role as any));
-  return group?.color || '#94a3b8';
-};
+// MbtiReply component removed, now imported from @/components/MbtiReply.tsx
 
-function MbtiReply({ parsed, messageId, theme, viewMode, selectedGameRoles, onDelete, forceShowAll }: { parsed: any; messageId: string; theme: keyof typeof themes; viewMode: ViewMode; selectedGameRoles?: string[]; onDelete?: (id: string) => void; forceShowAll?: boolean }) {
-  const [visibleCount, setVisibleCount] = useState(0);
-  const selectedBgId = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('chat_background') || '{}').id || 'none') : 'none';
-  const isDarkBg = ['rain', 'meadow', 'fireplace'].includes(selectedBgId);
-
-  useEffect(() => {
-    if (!forceShowAll) {
-      setVisibleCount(0);
-    }
-  }, [messageId, forceShowAll]);
-
-  useEffect(() => {
-    if (forceShowAll || parsed.roles.length === 0) return;
-    if (visibleCount >= parsed.roles.length) return;
-
-    const interval = setInterval(() => {
-      setVisibleCount((prev) => (prev >= parsed.roles.length ? prev : prev + 1));
-    }, 600);
-    return () => clearInterval(interval);
-  }, [parsed.roles.length, visibleCount]);
-
-  const effectiveVisibleCount = forceShowAll ? parsed.roles.length : (visibleCount || 1);
-  const visibleRoles = parsed.roles.slice(0, effectiveVisibleCount);
-  const spokenRoles = new Set(parsed.roles.map((r: any) => r.role));
-
-  const allowedSlots = (Array.isArray(selectedGameRoles) && selectedGameRoles.length > 0)
-    ? selectedGameRoles
-    : (viewMode === 'game' ? ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] : allMbtiRoles);
-
-  const silentRoles = allowedSlots.filter((r: any) => {
-    const roleId = (viewMode === 'game') ? r : r;
-    return !spokenRoles.has(roleId);
-  });
-
-  return (
-    <div className={`space-y-6 ${themes[theme].text}`}>
-      {/* 1. Intro Bubble (AI System/Narration) */}
-      {parsed.intro && (
-        <div className="flex gap-3">
-          <div
-            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mt-1"
-            style={{ backgroundColor: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.5)', backdropFilter: forceShowAll ? 'none' : 'blur(10px)' }}
-          >
-            <Sparkles className="w-5 h-5" style={{ color: themes[theme].accent }} />
-          </div>
-          <div
-            className={`p-4 rounded-2xl max-w-[90%] shadow-sm rounded-tl-sm`}
-            style={{ backgroundColor: forceShowAll ? '#ffffff' : (isDarkBg ? 'rgba(255,255,255,0.05)' : '#ffffff'), border: '1px solid rgba(0,0,0,0.05)' }}
-          >
-            <div
-              className={`text-sm max-w-none leading-relaxed`}
-              style={{ color: isDarkBg ? '#cbd5e1' : '#475569' }}
-            >
-              <ReactMarkdown>{parsed.intro}</ReactMarkdown>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Individual Role Bubbles */}
-      {visibleRoles.map((block: any, idx: number) => {
-        const roleColor = getRoleColor(block.role, viewMode);
-        return (
-          <div
-            key={`${messageId}-${block.role}-${idx}`}
-            className="flex gap-3"
-          >
-            {/* Avatar Section */}
-            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center bg-white shadow-md overflow-hidden"
-                style={{ border: `2px solid ${roleColor}` }}>
-                {viewMode === 'game' && getRoleAvatar(block.role, viewMode) ? (
-                  <img src={getRoleAvatar(block.role, viewMode)!} alt={block.role} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-2xl drop-shadow-sm">{getRoleEmoji(block.role, viewMode)}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Content Bubble */}
-            <div className="flex-1 max-w-[85%] space-y-1">
-              <div className="flex items-center gap-2 ml-1">
-                <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: roleColor }}>
-                  {getRoleLabel(block.role, viewMode)}
-                </span>
-                <div className="h-[1px] flex-1" style={{ backgroundColor: '#e2e8f0' }} />
-              </div>
-
-              <div
-                className={`p-4 rounded-2xl shadow-sm relative overflow-hidden ${forceShowAll ? '' : 'backdrop-blur-sm'} transition-colors`}
-                style={{
-                  backgroundColor: forceShowAll ? '#f8fafc' : `${roleColor}08`,
-                  borderColor: forceShowAll ? '#e2e8f0' : `${roleColor}15`,
-                  borderWidth: '1px'
-                }}
-              >
-                {/* Accent line on the left inside the bubble */}
-                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: roleColor }} />
-                <div
-                  className={`text-[14.5px] max-w-none leading-relaxed font-medium`}
-                  style={{ color: isDarkBg ? '#f8fafc' : '#1e293b' }}
-                >
-                  <ReactMarkdown>{block.text}</ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* 3. Silent/Status Info (Compact) */}
-
-
-      {parsed.outro && (forceShowAll || visibleCount >= parsed.roles.length) && (
-        <div className="flex gap-3 justify-end pr-4">
-          <div
-            className={`p-4 rounded-2xl border border-dashed max-w-[80%] shadow-inner relative`}
-            style={{ backgroundColor: forceShowAll ? '#f8fafc' : (isDarkBg ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.3)'), borderColor: '#e2e8f0' }}
-          >
-            <div
-              className={`absolute -top-2 left-4 px-2 text-[10px] font-bold uppercase tracking-tighter`}
-              style={{ backgroundColor: forceShowAll ? '#ffffff' : '#f8fafc', color: '#94a3b8' }}
-            >总结</div>
-            <div
-              className={`text-sm italic leading-relaxed`}
-              style={{ color: isDarkBg ? '#94a3b8' : '#64748b' }}
-            >
-              <ReactMarkdown>{parsed.outro}</ReactMarkdown>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recall Button */}
-      {onDelete && (
-        <div className="flex justify-start pl-14">
-          <button onClick={() => onDelete(messageId)} className="flex items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-red-400 transition-all opacity-50 hover:opacity-100">
-            <Trash2 className="w-3 h-3" />
-            <span>撤回此轮对话</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function ChatApp() {
   const router = useRouter();
@@ -1209,65 +975,8 @@ export default function ChatApp() {
     return images.filter(Boolean);
   };
 
-  const parseMbtiGroupReply = (content: string) => {
-    const lines = content.split('\n');
-    const roles = allMbtiRoles;
-    type Role = (typeof roles)[number];
+  // parseMbtiGroupReply removed, now imported from @/utils/mbtiUtils.ts
 
-    let introLines: string[] = [];
-    let outroLines: string[] = []; // 用于存放“小结”
-    let currentRole: Role | null = null;
-    let buffer: string[] = [];
-    const roleBlocks: { role: Role; text: string }[] = [];
-
-    const nameToSlot: Record<string, Role> = {
-      '祁煜': 'ENTJ',
-      '黎深': 'ISTJ',
-      '沈星回': 'ENFP',
-      '夏以昼': 'INFP',
-      '秦彻': 'ENFJ',
-    };
-    // 支持 16 型人格和 5 位男主，且匹配小结/总结
-    const roleRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(INTJ|INTP|ENTJ|ENTP|INFJ|INFP|ENFJ|ENFP|ISTJ|ISFJ|ESTJ|ESFJ|ISTP|ISFP|ESTP|ESFP|祁煜|黎深|沈星回|夏以昼|秦彻)[：:]/i;
-    const summaryRegex = /^[-*\s]*(?:\*{1,3}|#+)?\s*(小结|总结|总而言之)[：:]/i;
-
-    for (const line of lines) {
-      const match = line.match(roleRegex);
-      const summaryMatch = line.match(summaryRegex);
-
-      if (match) {
-        if (currentRole) {
-          roleBlocks.push({ role: currentRole, text: buffer.join('\n').trim() });
-        } else if (buffer.length > 0) {
-          introLines = buffer.slice();
-        }
-        const tag = match[1].toUpperCase();
-        // 如果是 Game 模式，保留中文名不映射回 MBTI；否则尝试映射
-        const mapped = viewMode === 'game' ? tag : ((nameToSlot as any)[tag] || tag);
-        currentRole = mapped as Role;
-        buffer = [line.replace(roleRegex, '').trim()];
-      } else if (summaryMatch) {
-        if (currentRole) {
-          roleBlocks.push({ role: currentRole, text: buffer.join('\n').trim() });
-          currentRole = null;
-        }
-        buffer = [line.replace(summaryRegex, '').trim()];
-        outroLines = buffer; // 接下来的内容放入 outro
-      } else {
-        buffer.push(line);
-      }
-    }
-
-    if (currentRole) {
-      roleBlocks.push({ role: currentRole, text: buffer.join('\n').trim() });
-    } else if (outroLines.length > 0) {
-      // 已经在 outro 里了
-    } else if (buffer.length > 0 && introLines.length === 0) {
-      introLines = buffer.slice();
-    }
-
-    return { intro: introLines.join('\n').trim(), roles: roleBlocks, outro: outroLines.join('\n').trim() };
-  };
 
   const handleCopy = () => {
     const lastMessage = messages[messages.length - 1];
@@ -2304,7 +2013,7 @@ export default function ChatApp() {
               .map((m: any) => {
                 const content = getMessageContent(m);
                 const images = getMessageImages(m);
-                const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
+                const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content, viewMode) : null;
                 const hasRoles = parsed && parsed.roles.length > 0;
 
                 if (m.role !== 'assistant' || !hasRoles) {
@@ -2399,6 +2108,8 @@ export default function ChatApp() {
                         messageId={m.id}
                         theme={selectedTheme}
                         viewMode={viewMode}
+                        isDarkBg={isDarkBg}
+                        accentColor={themes[selectedTheme].accent}
                         onDelete={deleteMessage}
                         selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
                       />
@@ -3071,7 +2782,7 @@ export default function ChatApp() {
                 </div>
               </div>
               <div className="text-[10px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000', opacity: 0.4 }}>
-                {new Date().toLocaleDateString()}
+                {isMounted ? new Date().toLocaleDateString() : ''}
               </div>
             </div>
 
@@ -3082,7 +2793,7 @@ export default function ChatApp() {
                 .map((m: any) => {
                   const content = getMessageContent(m);
                   const images = getMessageImages(m);
-                  const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content) : null;
+                  const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content, viewMode) : null;
                   const hasRoles = parsed && parsed.roles.length > 0;
 
                   if (m.role !== 'assistant' || !hasRoles) {
@@ -3093,21 +2804,23 @@ export default function ChatApp() {
                           style={{
                             backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
                             color: m.role === 'user' ? '#ffffff' : themes[selectedTheme].accent,
-                            border: '1px solid rgba(255,255,255,0.3)'
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                           }}
                         >
                           {m.role === 'user' ? (
-                            <div className="text-[9px] font-black uppercase">You</div>
+                            <div className="text-[9px] font-black uppercase" style={{ color: '#ffffff' }}>You</div>
                           ) : (
-                            <Sparkles className="w-4 h-4" />
+                            <Sparkles className="w-4 h-4" style={{ color: themes[selectedTheme].accent }} />
                           )}
                         </div>
                         <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
                           <div
-                            className={`p-4 rounded-2xl ${m.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm shadow-sm'}`}
+                            className={`p-4 rounded-2xl ${m.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
                             style={{
                               backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
                               border: m.role === 'user' ? 'none' : '1px solid #f1f5f9',
+                              boxShadow: m.role === 'user' ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
                             }}
                           >
                             <div
@@ -3136,6 +2849,8 @@ export default function ChatApp() {
                         messageId={`export-${m.id}`}
                         theme={selectedTheme}
                         viewMode={viewMode}
+                        isDarkBg={isDarkBg}
+                        accentColor={themes[selectedTheme].accent}
                         forceShowAll={true}
                         selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
                       />
@@ -3147,13 +2862,13 @@ export default function ChatApp() {
             {/* Footer */}
             <div
               className="mt-8 pt-6 flex justify-between items-center"
-              style={{ borderTop: '1px solid rgba(255,255,255,0.1)', opacity: 0.4 }}
+              style={{ borderTop: `1px solid ${isDarkBg ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`, opacity: 0.4 }}
             >
               <div className="text-[9px] font-bold tracking-widest uppercase" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
                 Shared from Chat Blog App
               </div>
               <div className="text-[9px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
-                {new Date().toLocaleTimeString()}
+                {isMounted ? new Date().toLocaleTimeString() : ''}
               </div>
             </div>
           </div>

@@ -67,10 +67,10 @@ export const Logo = ({ className = "w-12 h-8", showText = true, accentColor = "#
 
     {showText && (
       <div className="flex flex-col justify-center">
-        <h1 className="text-[#2563EB] font-bold text-lg leading-tight tracking-tight">
+        <h1 className="font-bold text-lg leading-tight tracking-tight" style={{ color: '#2563EB' }}>
           Chat2<span style={{ color: accentColor }}>Blog</span>
         </h1>
-        <p className="text-slate-400 text-[9px] font-medium tracking-wide mt-0.5">
+        <p className="text-[9px] font-medium tracking-wide mt-0.5" style={{ color: '#94a3b8' }}>
           Conversations to Stories
         </p>
       </div>

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabaseClient } from "@/lib/supabaseClient";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import html2canvas from 'html2canvas';
 import { Logo } from "@/components/Logo";
 import { UserStatus } from '@/components/UserStatus';
+import { MbtiReply } from "@/components/MbtiReply";
 import {
   ArrowLeft,
   ChevronDown,
@@ -21,11 +23,44 @@ import {
   FileText,
   Trash2,
   Globe,
-  Palette
+  Palette,
+  Camera,
+  ImageIcon,
+  Download,
+  Loader2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "framer-motion";
 import { prepareMessagesForBlog, restoreBlogImages } from '@/utils/blogUtils';
+import { parseMbtiGroupReply, getRoleEmoji, getRoleAvatar, getRoleLabel, getRoleColor } from '@/utils/mbtiUtils';
+
+const PERSONA_BLOCK_REGEX = /\[\[\[USER_PERSONA\]\]\][\s\S]*?\[\[\[\/USER_PERSONA\]\]\]/g;
+const ROLES_BLOCK_REGEX = /\[\[\[SELECTED_ROLES\]\]\][\s\S]*?\[\[\[\/SELECTED_ROLES\]\]\]/g;
+
+const stripPersonaBlock = (text: string) => (text || '').replace(PERSONA_BLOCK_REGEX, '').trim();
+const stripRolesBlock = (text: string) => (text || '').replace(ROLES_BLOCK_REGEX, '').trim();
+
+const getMessageContent = (content: any) => {
+  let text = '';
+  if (typeof content === 'string') text = content;
+  else if (Array.isArray(content)) {
+    text = content.map((p: any) => p.text || '').join('');
+  }
+  return stripRolesBlock(stripPersonaBlock(text));
+};
+
+const getMessageImages = (message: any) => {
+  let images: string[] = [];
+  if (Array.isArray(message.content)) {
+    images = message.content.filter((p: any) => p.type === 'image' || p.image).map((p: any) => p.image || p.data);
+  }
+  const atts = message.experimental_attachments || message.attachments || message.audio_records; // Just in case
+  if (Array.isArray(atts)) {
+    const attImages = atts.filter((a: any) => a.contentType?.startsWith('image/') || a.url?.startsWith('data:image/')).map((a: any) => a.url);
+    images = [...images, ...attImages];
+  }
+  return images.filter(Boolean);
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +77,7 @@ export default function ConversationDetailPage() {
   const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(false);
   const [isCommunityDropdownOpen, setIsCommunityDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Blog Generation State
   const [blogStyle, setBlogStyle] = useState<'literary' | 'logical' | 'record'>('literary');
@@ -51,6 +87,8 @@ export default function ConversationDetailPage() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [nickname, setNickname] = useState('');
+  const [isExportingImage, setIsExportingImage] = useState(false);
+  const captureRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -125,6 +163,52 @@ export default function ConversationDetailPage() {
     };
     if (id) load();
   }, [id]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const handleDownloadImage = async () => {
+    if (selectedMessageIds.size === 0) {
+      alert('请先选择要生成的聊天内容');
+      return;
+    }
+
+    try {
+      setIsExportingImage(true);
+      await new Promise(r => setTimeout(r, 800));
+
+      if (!captureRef.current) throw new Error('Capture area not found');
+
+      const images = captureRef.current.querySelectorAll('img');
+      const imagePromises = Array.from(images).map((img: HTMLImageElement) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      });
+      await Promise.all(imagePromises);
+
+      const canvas = await html2canvas(captureRef.current, {
+        useCORS: true,
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+
+      const image = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `chat-export-${new Date().getTime()}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Failed to generate image:', error);
+      alert('生成图片失败，请重试');
+    } finally {
+      setIsExportingImage(false);
+    }
+  };
 
   return (
     <main className="relative flex flex-col min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-sans">
@@ -332,108 +416,142 @@ export default function ConversationDetailPage() {
             }
             if (pendingUser) pairs.push({ user: pendingUser, assistant: null });
             return pairs.reverse();
-          })().map((pair, pairIdx) => (
-            <div key={pairIdx} className="flex gap-3 items-start">
-              {isSelectionMode && (
-                <button
-                  onClick={() => {
-                    const ids = [pair.user?.id, pair.assistant?.id].filter(Boolean) as string[];
-                    const next = new Set(selectedMessageIds);
-                    // If both exist and are selected, deselect both. If one missing or unselected, select available ones.
-                    // Simple logic: toggle group.
-                    const allSelected = ids.every(id => next.has(id));
-                    if (allSelected) {
-                      ids.forEach(id => next.delete(id));
-                    } else {
-                      ids.forEach(id => next.add(id));
-                    }
-                    setSelectedMessageIds(next);
-                  }}
-                  className={`mt-6 flex-shrink-0 transition-all ${[pair.user?.id, pair.assistant?.id].filter(Boolean).every(id => selectedMessageIds.has(id as string)) ? 'text-[var(--accent-main)]' : 'text-slate-300 hover:text-slate-400'}`}
-                >
-                  {[pair.user?.id, pair.assistant?.id].filter(Boolean).every(id => selectedMessageIds.has(id as string)) ? (
-                    <CheckSquare className="w-5 h-5" />
-                  ) : (
-                    <Square className="w-5 h-5" />
-                  )}
-                </button>
-              )}
+          })().map((pair, pairIdx) => {
+            const userContent = pair.user ? getMessageContent(pair.user.content) : '';
+            const assistantContent = pair.assistant ? getMessageContent(pair.assistant.content) : '';
+            const viewMode = (conversation?.view_mode === 'game' ? 'game' : 'mbti') as 'mbti' | 'game';
+            const parsed = pair.assistant ? parseMbtiGroupReply(assistantContent, viewMode) : null;
+            const hasRoles = parsed && parsed.roles.length > 0;
 
-              <div
-                className={`flex-1 group p-6 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all space-y-6 ${isSelectionMode ? 'cursor-pointer' : ''}`}
-                onClick={() => {
-                  if (isSelectionMode) {
-                    const ids = [pair.user?.id, pair.assistant?.id].filter(Boolean) as string[];
-                    const next = new Set(selectedMessageIds);
-                    const allSelected = ids.every(id => next.has(id));
-                    if (allSelected) {
-                      ids.forEach(id => next.delete(id));
-                    } else {
-                      ids.forEach(id => next.add(id));
-                    }
-                    setSelectedMessageIds(next);
-                  }
-                }}
-              >
-                {pair.user && (
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase">You</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-800 font-medium leading-relaxed prose prose-sm max-w-none">
-                        <ReactMarkdown
-                          urlTransform={(url) => url}
-                          components={{
-                            img: ({ node, ...props }) => (
-                              <img
-                                {...props}
-                                className="max-w-[200px] max-h-[200px] rounded-lg border border-slate-200 shadow-sm object-cover my-2 inline-block"
-                              />
-                            )
-                          }}
-                        >
-                          {pair.user.content}
-                        </ReactMarkdown>
-                      </div>
-                      <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.user.created_at).toLocaleTimeString()}</div>
-                    </div>
-                  </div>
+            return (
+              <div key={pairIdx} className="flex gap-3 items-start">
+                {isSelectionMode && (
+                  <button
+                    onClick={() => {
+                      const ids = [pair.user?.id, pair.assistant?.id].filter(Boolean) as string[];
+                      const next = new Set(selectedMessageIds);
+                      const allSelected = ids.every(id => next.has(id));
+                      if (allSelected) {
+                        ids.forEach(id => next.delete(id));
+                      } else {
+                        ids.forEach(id => next.add(id));
+                      }
+                      setSelectedMessageIds(next);
+                    }}
+                    className={`mt-6 flex-shrink-0 transition-all ${[pair.user?.id, pair.assistant?.id].filter(Boolean).every(id => selectedMessageIds.has(id as string)) ? 'text-[var(--accent-main)]' : 'text-slate-300 hover:text-slate-400'}`}
+                  >
+                    {[pair.user?.id, pair.assistant?.id].filter(Boolean).every(id => selectedMessageIds.has(id as string)) ? (
+                      <CheckSquare className="w-5 h-5" />
+                    ) : (
+                      <Square className="w-5 h-5" />
+                    )}
+                  </button>
                 )}
-                {pair.assistant && (
-                  <div className={`flex gap-4 ${pair.user ? 'pt-6 border-t border-slate-50' : ''}`}>
-                    <div className="w-8 h-8 rounded-full bg-orange-50 flex-shrink-0 flex items-center justify-center text-orange-400"><Sparkles className="w-4 h-4" /></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-800 font-medium leading-relaxed prose prose-sm max-w-none">
-                        <ReactMarkdown
-                          urlTransform={(url) => url}
-                          components={{
-                            img: ({ node, ...props }) => (
-                              <img
-                                {...props}
-                                className="max-w-[200px] max-h-[200px] rounded-lg border border-slate-200 shadow-sm object-cover my-2 inline-block"
-                              />
-                            )
-                          }}
-                        >
-                          {pair.assistant.content}
-                        </ReactMarkdown>
+
+                <div
+                  className={`flex-1 group transition-all space-y-6 ${isSelectionMode ? 'cursor-pointer' : ''}`}
+                  onClick={() => {
+                    if (isSelectionMode) {
+                      const ids = [pair.user?.id, pair.assistant?.id].filter(Boolean) as string[];
+                      const next = new Set(selectedMessageIds);
+                      const allSelected = ids.every(id => next.has(id));
+                      if (allSelected) {
+                        ids.forEach(id => next.delete(id));
+                      } else {
+                        ids.forEach(id => next.add(id));
+                      }
+                      setSelectedMessageIds(next);
+                    }
+                  }}
+                >
+                  {pair.user && (
+                    <div className="flex gap-4 flex-row-reverse">
+                      <div className="w-8 h-8 rounded-full bg-[var(--accent-main)] flex-shrink-0 flex items-center justify-center text-[10px] font-black text-white uppercase shadow-sm">You</div>
+                      <div className="flex-1 flex flex-col items-end min-w-0">
+                        <div className="p-4 rounded-2xl rounded-tr-sm bg-[var(--accent-main)] text-white shadow-sm border border-[var(--accent-main)]/20">
+                          <div className="text-sm font-medium leading-relaxed prose prose-sm prose-invert max-w-none">
+                            <ReactMarkdown
+                              urlTransform={(url) => url}
+                              components={{
+                                img: ({ node, ...props }) => (
+                                  <img
+                                    {...props}
+                                    className="max-w-[200px] max-h-[200px] rounded-lg border border-white/20 shadow-sm object-cover my-2 inline-block"
+                                  />
+                                )
+                              }}
+                            >
+                              {userContent}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                        <div className="text-[9px] text-slate-300 font-bold mt-1 uppercase tracking-widest">{new Date(pair.user.created_at).toLocaleTimeString()}</div>
                       </div>
-                      <div className="text-[10px] text-slate-300 font-bold mt-2 uppercase tracking-widest">{new Date(pair.assistant.created_at).toLocaleTimeString()}</div>
+                    </div>
+                  )}
+
+                  {pair.assistant && (
+                    <div className="space-y-6">
+                      {pair.assistant && !hasRoles && (
+                        <div className="flex gap-4">
+                          <div className="w-8 h-8 rounded-full bg-white flex-shrink-0 flex items-center justify-center text-[var(--accent-main)] border border-slate-100 shadow-sm">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0 flex flex-col items-start">
+                            <div className="p-4 rounded-2xl rounded-tl-sm bg-white shadow-sm border border-slate-100">
+                              <div className="text-sm text-slate-800 font-medium leading-relaxed prose prose-sm max-w-none">
+                                <ReactMarkdown
+                                  urlTransform={(url) => url}
+                                  components={{
+                                    img: ({ node, ...props }) => (
+                                      <img
+                                        {...props}
+                                        className="max-w-[200px] max-h-[200px] rounded-lg border border-slate-200 shadow-sm object-cover my-2 inline-block"
+                                      />
+                                    )
+                                  }}
+                                >
+                                  {assistantContent}
+                                </ReactMarkdown>
+                                {getMessageImages(pair.assistant).length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mt-3">
+                                    {getMessageImages(pair.assistant).map((img, idx) => (
+                                      <img key={idx} src={img} alt="" className="max-w-full rounded-xl shadow-sm border border-slate-100" />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-slate-300 font-bold mt-1 uppercase tracking-widest">{new Date(pair.assistant.created_at).toLocaleTimeString()}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {hasRoles && (
+                        <MbtiReply
+                          parsed={parsed!}
+                          messageId={pair.assistant.id}
+                          viewMode={viewMode}
+                          accentColor="#F59E0B"
+                        />
+                      )}
+
                       {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
-                        <div className="mt-4 space-y-3">
+                        <div className="mt-4 px-12 space-y-2">
                           {pair.assistant.audio_records.map((audio: any) => (
                             <div key={audio.id} className="flex flex-col gap-1">
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{audio.type === 'tts' ? 'Voice Response' : 'Recording'}</span>
-                              <audio controls src={audio.url} className="h-8 w-full max-w-sm rounded-lg" />
+                              <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest ml-1">{audio.type === 'tts' ? 'Voice Response' : 'Recording'}</span>
+                              <audio controls src={audio.url} className="h-7 w-full max-w-[240px] opacity-60 hover:opacity-100 transition-opacity" />
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {!loading && !error && messages.length === 0 && (
             <div className="py-20 text-center">
               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">No messages in this conversation.</p>
@@ -553,11 +671,134 @@ export default function ConversationDetailPage() {
                 >
                   {blogLoading ? '生成中...' : '生成博客'}
                 </button>
+
+                <button
+                  disabled={isExportingImage}
+                  onClick={handleDownloadImage}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-all shadow-lg ${isExportingImage ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 active:scale-95 shadow-blue-100'}`}
+                >
+                  {isExportingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                  <span>{isExportingImage ? '生成中...' : '生成图片'}</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Hidden Capture Area for Image Export */}
+      <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
+        <div
+          ref={captureRef}
+          className="p-10 w-[600px] flex flex-col gap-6 bg-white"
+          style={{ backgroundColor: '#ffffff' }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.05)' }}
+              >
+                <Sparkles className="w-6 h-6" style={{ color: '#F59E0B' }} />
+              </div>
+              <div>
+                <div className="text-sm font-black tracking-tight" style={{ color: '#0f172a' }}>
+                  智聊室 · Chat Blog
+                </div>
+                <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94a3b8', opacity: 0.6 }}>
+                  Creative Co-Creation
+                </div>
+              </div>
+            </div>
+            <div className="text-[10px] font-mono" style={{ color: '#94a3b8', opacity: 0.4 }}>
+              {isMounted ? new Date().toLocaleDateString() : ''}
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="space-y-8">
+            {messages
+              .filter((m: any) => selectedMessageIds.has(m.id))
+              .map((m: any) => {
+                const content = getMessageContent(m.content);
+                const images = getMessageImages(m);
+                const viewMode = (conversation?.view_mode === 'game' ? 'game' : 'mbti') as 'mbti' | 'game';
+                const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content, viewMode) : null;
+                const hasRoles = parsed && parsed.roles.length > 0;
+
+                if (m.role !== 'assistant' || !hasRoles) {
+                  return (
+                    <div key={`export-${m.id}`} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                      <div
+                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1"
+                        style={{
+                          backgroundColor: m.role === 'user' ? '#F59E0B' : '#ffffff',
+                          color: m.role === 'user' ? '#ffffff' : '#F59E0B',
+                          border: '1px solid rgba(0,0,0,0.05)',
+                          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                        }}
+                      >
+                        {m.role === 'user' ? (
+                          <div className="text-[9px] font-black uppercase" style={{ color: '#ffffff' }}>You</div>
+                        ) : (
+                          <Sparkles className="w-4 h-4" style={{ color: '#F59E0B' }} />
+                        )}
+                      </div>
+                      <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                        <div
+                          className={`p-4 rounded-2xl ${m.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
+                          style={{
+                            backgroundColor: m.role === 'user' ? '#F59E0B' : '#ffffff',
+                            border: m.role === 'user' ? 'none' : '1px solid #f1f5f9',
+                            boxShadow: m.role === 'user' ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                          }}
+                        >
+                          <div
+                            className={`text-[14px] max-w-none leading-relaxed ${m.role === 'user' ? 'font-medium' : ''}`}
+                            style={{ color: m.role === 'user' ? '#ffffff' : '#334155' }}
+                          >
+                            <ReactMarkdown>{content}</ReactMarkdown>
+                            {images.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {images.map((img, idx) => (
+                                  <img key={idx} src={img} alt="" className="max-w-full rounded-xl shadow-sm border border-slate-100" />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={`export-${m.id}`}>
+                    <MbtiReply
+                      parsed={parsed!}
+                      messageId={`export-${m.id}`}
+                      viewMode={viewMode}
+                      forceShowAll={true}
+                    />
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 pt-6 flex justify-between items-center" style={{ borderTop: '1px solid #f1f5f9' }}>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-black text-white"
+                style={{ backgroundColor: '#F59E0B' }}
+              >B</div>
+              <div className="text-[10px] font-bold" style={{ color: '#94a3b8' }}>Created via Chat2Blog</div>
+            </div>
+            <div className="text-[9px] font-medium" style={{ color: '#cbd5e1' }}>#{conversation?.id?.slice(0, 8)}</div>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
