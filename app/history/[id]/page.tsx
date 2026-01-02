@@ -652,7 +652,7 @@ export default function ConversationDetailPage() {
                         <div className="w-8 h-8 rounded-full flex-shrink-0 mt-1 flex items-center justify-center text-[8px] font-black text-white bg-orange-500 border border-orange-600 shadow-sm uppercase">YOU</div>
                         <div className="p-4 rounded-2xl max-w-[85%] rounded-tr-sm bg-orange-500 text-white shadow-sm border border-orange-600">
                           <div className="text-sm leading-relaxed prose prose-invert">
-                            <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="lazy" /> : null }}>
+                            <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="eager" /> : null }}>
                               {p.userContent}
                             </ReactMarkdown>
                           </div>
@@ -672,7 +672,7 @@ export default function ConversationDetailPage() {
                             </div>
                             <div className="p-4 rounded-2xl max-w-[85%] rounded-tl-sm bg-white text-slate-800 shadow-sm border border-slate-100">
                               <div className="text-sm leading-relaxed prose">
-                                <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="lazy" /> : null }}>
+                                <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="eager" /> : null }}>
                                   {p.assistantContent}
                                 </ReactMarkdown>
                               </div>
