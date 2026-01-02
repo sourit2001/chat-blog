@@ -1269,7 +1269,7 @@ export default function ChatApp() {
   const deleteMessage = async (messageId: string) => {
     try {
       // 1. Local state update
-      setMessagesActive(prev => prev.filter(m => m.id !== messageId));
+      setMessagesActive((prev: any[]) => prev.filter((m: any) => m.id !== messageId));
 
       // 2. Clear selected roles cache for this message if it's assistant
       setMessageSelectedRoles(prev => {
