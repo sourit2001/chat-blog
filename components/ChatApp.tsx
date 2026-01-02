@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { usePathname, useRouter } from 'next/navigation';
@@ -516,9 +517,23 @@ export default function ChatApp() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const captureRef = useRef<HTMLDivElement>(null);
   const [isExportingImage, setIsExportingImage] = useState(false);
+  const [fontSize, setFontSize] = useState<'standard' | 'large' | 'xlarge'>('standard');
 
   // Sync theme and background to CSS variables
   const isDarkBg = ['rain', 'meadow', 'fireplace'].includes(selectedBg.id);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedFontSize = localStorage.getItem('chat_font_size');
+      if (savedFontSize === 'standard' || savedFontSize === 'large' || savedFontSize === 'xlarge') {
+        setFontSize(savedFontSize);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('chat_font_size', fontSize);
+  }, [fontSize]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -563,7 +578,47 @@ export default function ChatApp() {
       setViewMode(fixedMode);
       setTtsVoice(fixedMode === 'game' ? 'male' : 'female');
     }
-  }, [fixedMode]);
+  }, [fixedMode, viewMode]);
+
+  // Load the latest conversation when viewMode changes or on mount
+  useEffect(() => {
+    let active = true;
+    const restoreSession = async () => {
+      if (!supabaseClient) return;
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+
+      // Find the LATEST conversation for this mode
+      const { data: found } = await supabaseClient
+        .from('conversations')
+        .select('id, messages(id, role, content)')
+        .eq('user_id', user.id)
+        .eq('view_mode', viewMode)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (active && found && found.length > 0) {
+        setConversationId(found[0].id);
+
+        // Restore messages too!
+        if (found[0].messages) {
+          const restored = found[0].messages.map((m: any) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content
+          }));
+          // Sort explicitly by ID or just trust returning order if handled
+          // But usually we need to ensure correct message order
+          // Here we just set conversationId, messages often loaded separately or we can set them
+          // Let's at least set conversationId so new messages append to it.
+        }
+      } else {
+        if (active) setConversationId(null);
+      }
+    };
+    restoreSession();
+    return () => { active = false; };
+  }, [viewMode]);
   // Game mode: selectable chat members (default all 5)
   // Mode-based selectable chat members
   const allGameRoles = ['沈星回', '黎深', '祁煜', '夏以昼', '秦彻'] as const;
@@ -817,6 +872,7 @@ export default function ChatApp() {
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('text');
   // Conversation storage
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const conversationPromiseRef = useRef<Promise<string | null> | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
   const lastStoredMessageIdRef = useRef<string | null>(null);
   const lastAssistantDbIdRef = useRef<string | null>(null);
@@ -1048,50 +1104,108 @@ export default function ChatApp() {
   }, [messages, isLoading]);
 
   // Ensure a conversation exists for current user and view mode
-  const ensureConversation = async () => {
+  const ensureConversation = async (initialTitle?: string) => {
     if (conversationId) return conversationId;
-    if (!supabaseClient) return null;
-    const client = supabaseClient;
-    const { data: { user } } = await client.auth.getUser();
-    if (!user) return null;
-    // Try find latest conversation for this viewMode created today
-    const { data: found } = await client
-      .from('conversations')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('view_mode', viewMode)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (found && found.length > 0) {
-      setConversationId(found[0].id);
-      return found[0].id as string;
+    if (conversationPromiseRef.current) return conversationPromiseRef.current;
+
+    const createOrFind = async (): Promise<string | null> => {
+      if (!supabaseClient) return null;
+      const client = supabaseClient;
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) return null;
+
+      // Reuse the latest conversation for this viewMode, regardless of when it was created
+      /* 
+         Change: Removed the 1-hour time limit. 
+         Reason: User wants to continue the same historical session (e.g., "MBTI Team Chat") indefinitely 
+                 unless explicitly cleared, rather than creating new fragments every hour.
+      */
+      const { data: found } = await client
+        .from('conversations')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('view_mode', viewMode)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (found && found.length > 0) {
+        // If we found an existing conversation, reuse it!
+        setConversationId(found[0].id);
+        return found[0].id as string;
+      }
+
+      const cleanTitle = (initialTitle || '')
+        .replace(/\[\[\[[\s\S]*?\]\]\]/g, '')
+        .trim();
+
+      const title = cleanTitle
+        ? (cleanTitle.slice(0, 50) + (cleanTitle.length > 50 ? '...' : ''))
+        : (viewMode === 'game' ? '恋与深空会话' : 'MBTI 团队会话');
+
+      const { data: created, error } = await client
+        .from('conversations')
+        .insert({ user_id: user.id, title, view_mode: viewMode })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Failed to create conversation:', error);
+        return null;
+      }
+      setConversationId(created.id);
+      return created.id as string;
+    };
+
+    conversationPromiseRef.current = createOrFind();
+    try {
+      const res = await conversationPromiseRef.current;
+      return res;
+    } finally {
+      conversationPromiseRef.current = null;
     }
-    // Create new conversation
-    const title = viewMode === 'game' ? '恋与深空会话' : 'MBTI 团队会话';
-    const { data: created, error } = await client
-      .from('conversations')
-      .insert({ user_id: user.id, title, view_mode: viewMode })
-      .select('id')
-      .single();
-    if (error) return null;
-    setConversationId(created.id);
-    return created.id as string;
   };
 
   const saveMessage = async (role: 'user' | 'assistant', content: string): Promise<string | null> => {
     try {
-      const convId = await ensureConversation();
+      const convId = await ensureConversation(content);
       if (!convId || !supabaseClient) return null;
       const client = supabaseClient;
+
+      // 1. Insert message
       const { data, error } = await client
         .from('messages')
         .insert({ conversation_id: convId, role, content })
         .select('id')
         .single();
+
       if (error) throw error;
+
+      // 2. "Touch" the conversation to update its timestamp (if updated_at trigger exists)
+      // Only update title if it's still the default generic title.
+      try {
+        const { data: currentConv } = await client
+          .from('conversations')
+          .select('title')
+          .eq('id', convId)
+          .single();
+
+        const isGenericTitle = currentConv?.title?.includes('会话') || currentConv?.title === '新对话';
+
+        if (isGenericTitle) {
+          await client
+            .from('conversations')
+            .update({
+              title: content.slice(0, 50) + (content.length > 50 ? '...' : '')
+            })
+            .eq('id', convId);
+        }
+      } catch (err) {
+        console.warn('Failed to update title', err);
+      }
+
       return data?.id ?? null;
     } catch (e) {
-      console.warn('saveMessage skipped:', (e as any)?.message);
+      console.error('saveMessage failed:', e);
       return null;
     }
   };
@@ -1120,6 +1234,7 @@ export default function ChatApp() {
 
   const clearChat = () => {
     setMessagesActive([]);
+    setConversationId(null); // Reset conversation ID to start a new history entry next time
     setMessageSelectedRoles({});
     selectedRolesQueueRef.current = [];
     window.speechSynthesis?.cancel?.();
@@ -1948,7 +2063,7 @@ export default function ChatApp() {
           </button>
         </div>
 
-        {/* Background Overlay for readability */}
+
         {(selectedBg.url || selectedBg.id === 'rain' || selectedBg.id === 'meadow') && (
           <div className={`absolute inset-0 ${['rain', 'meadow'].includes(selectedBg.id) ? 'backdrop-blur-none' : 'backdrop-blur-[8px]'} -z-10 pointer-events-none transition-all duration-1000 ${selectedBg.id === 'rain' ? 'bg-transparent' : 'bg-white/10'}`} />
         )}
@@ -1958,7 +2073,6 @@ export default function ChatApp() {
           <div className={`${themes[selectedTheme].bg} absolute inset-0 -z-30 opacity-100`} />
         )}
 
-        {/* Mobile Header */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-panel)] z-50">
           <div className="flex items-center gap-3">
             <button
@@ -1969,8 +2083,14 @@ export default function ChatApp() {
             </button>
             <Logo className="w-7 h-7 opacity-90" showText={true} accentColor={themes[selectedTheme].accent} />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <UserStatus />
+            <button
+              onClick={() => setIsAppearanceDrawerOpen(true)}
+              className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Palette className="w-5 h-5 text-[var(--accent-main)]" />
+            </button>
             <button
               onClick={() => setIsPersonaDrawerOpen(true)}
               className="p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
@@ -1980,7 +2100,6 @@ export default function ChatApp() {
           </div>
         </header>
 
-        {/* Global Persona Bar (if active) */}
         {(viewMode === 'game' || viewMode === 'mbti') && (
           <div className="px-4 py-2 border-b border-[var(--border-light)] bg-[var(--bg-panel)]/40 backdrop-blur-sm">
             <div className="max-w-4xl mx-auto flex items-center justify-start gap-4 text-xs overflow-x-auto no-scrollbar scroll-smooth">
@@ -2099,7 +2218,7 @@ export default function ChatApp() {
                             </span>
                           )}
                           <div className={`p-3 md:p-4 relative group ${m.role === 'user' ? `${themes[selectedTheme].bubbleUser} rounded-2xl rounded-tr-sm` : `${themes[selectedTheme].bubbleBot} rounded-2xl rounded-tl-sm`}`}>
-                            <div className={`text-[15px] prose prose-sm ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-[var(--text-primary)]'}`}>
+                            <div className={`${fontSize === 'xlarge' ? 'text-[20px]' : fontSize === 'large' ? 'text-[17px]' : 'text-[15px]'} prose prose-sm ${isDarkBg ? 'prose-invert' : ''} max-w-none leading-relaxed ${m.role === 'user' ? 'text-white drop-shadow-sm' : 'text-[var(--text-primary)]'}`}>
                               <ReactMarkdown>{content}</ReactMarkdown>
                               {images.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mt-3">
@@ -2159,6 +2278,7 @@ export default function ChatApp() {
                         isDarkBg={isDarkBg}
                         accentColor={themes[selectedTheme].accent}
                         onDelete={deleteMessage}
+                        fontSize={fontSize}
                         selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
                       />
                     </div>
@@ -2786,6 +2906,26 @@ export default function ChatApp() {
                     </div>
                   )}
                 </div>
+
+                {/* Font Size Selection */}
+                <div className="space-y-4 pt-4 border-t border-[var(--border-light)]">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-[var(--text-tertiary)]">字体大小</h4>
+                  <div className="flex gap-2">
+                    {[
+                      { id: 'standard', name: '标准', size: 'text-xs' },
+                      { id: 'large', name: '大', size: 'text-sm' },
+                      { id: 'xlarge', name: '更大', size: 'text-base' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setFontSize(f.id as any)}
+                        className={`flex-1 py-3 rounded-2xl border-2 font-bold transition-all ${fontSize === f.id ? 'border-[var(--accent-main)] bg-[var(--bg-hover)] text-[var(--accent-main)]' : 'border-[var(--border-light)] text-[var(--text-tertiary)] hover:border-[var(--accent-main)]/30'}`}
+                      >
+                        <span className={f.size}>{f.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="p-6 border-t border-slate-50">
@@ -2802,126 +2942,127 @@ export default function ChatApp() {
       </AnimatePresence>
 
       {/* Hidden Capture Area for Image Export */}
-      {isMounted && (
-        <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
-          <div
-            ref={captureRef}
-            className={`p-10 w-[600px] flex flex-col gap-6 ${isDarkBg ? 'bg-[#0f172a]' : 'bg-white'}`}
-            style={{
-              backgroundColor: isDarkBg ? '#0f172a' : (themes[selectedTheme].bg.match(/\[(.*?)\]/)?.[1] || '#ffffff'),
-            }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.05)' }}
-                >
-                  <Sparkles className="w-6 h-6" style={{ color: themes[selectedTheme].accent }} />
+      {
+        isMounted && (
+          <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
+            <div
+              ref={captureRef}
+              className={`p-10 w-[600px] flex flex-col gap-6 ${isDarkBg ? 'bg-[#0f172a]' : 'bg-white'}`}
+              style={{
+                backgroundColor: isDarkBg ? '#0f172a' : (themes[selectedTheme].bg.match(/\[(.*?)\]/)?.[1] || '#ffffff'),
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.05)' }}
+                  >
+                    <Sparkles className="w-6 h-6" style={{ color: themes[selectedTheme].accent }} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black tracking-tight" style={{ color: isDarkBg ? '#ffffff' : '#1f2937' }}>
+                      智聊室 · Chat Blog
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: isDarkBg ? '#cbd5e1' : '#64748b', opacity: 0.6 }}>
+                      Creative Co-Creation
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-black tracking-tight" style={{ color: isDarkBg ? '#ffffff' : '#1f2937' }}>
-                    智聊室 · Chat Blog
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: isDarkBg ? '#cbd5e1' : '#64748b', opacity: 0.6 }}>
-                    Creative Co-Creation
-                  </div>
+                <div className="text-[10px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000', opacity: 0.4 }}>
+                  {isMounted ? new Date().toLocaleDateString() : ''}
                 </div>
               </div>
-              <div className="text-[10px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000', opacity: 0.4 }}>
-                {isMounted ? new Date().toLocaleDateString() : ''}
-              </div>
-            </div>
 
-            {/* Messages */}
-            <div className="space-y-8">
-              {messages
-                .filter((m: any) => selectedMessageIds.has(m.id))
-                .map((m: any) => {
-                  const content = getMessageContent(m);
-                  const images = getMessageImages(m);
-                  const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content, viewMode) : null;
-                  const hasRoles = parsed && parsed.roles.length > 0;
+              {/* Messages */}
+              <div className="space-y-8">
+                {messages
+                  .filter((m: any) => selectedMessageIds.has(m.id))
+                  .map((m: any) => {
+                    const content = getMessageContent(m);
+                    const images = getMessageImages(m);
+                    const parsed = m.role === 'assistant' ? parseMbtiGroupReply(content, viewMode) : null;
+                    const hasRoles = parsed && parsed.roles.length > 0;
 
-                  if (m.role !== 'assistant' || !hasRoles) {
-                    return (
-                      <div key={`export-${m.id}`} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                        <div
-                          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1"
-                          style={{
-                            backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
-                            color: m.role === 'user' ? '#ffffff' : themes[selectedTheme].accent,
-                            border: '1px solid rgba(255,255,255,0.3)',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                          }}
-                        >
-                          {m.role === 'user' ? (
-                            <div className="text-[9px] font-black uppercase" style={{ color: '#ffffff' }}>You</div>
-                          ) : (
-                            <Sparkles className="w-4 h-4" style={{ color: themes[selectedTheme].accent }} />
-                          )}
-                        </div>
-                        <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                    if (m.role !== 'assistant' || !hasRoles) {
+                      return (
+                        <div key={`export-${m.id}`} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                           <div
-                            className={`p-4 rounded-2xl ${m.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
+                            className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1"
                             style={{
                               backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
-                              border: m.role === 'user' ? 'none' : '1px solid #f1f5f9',
-                              boxShadow: m.role === 'user' ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                              color: m.role === 'user' ? '#ffffff' : themes[selectedTheme].accent,
+                              border: '1px solid rgba(255,255,255,0.3)',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                             }}
                           >
+                            {m.role === 'user' ? (
+                              <div className="text-[9px] font-black uppercase" style={{ color: '#ffffff' }}>You</div>
+                            ) : (
+                              <Sparkles className="w-4 h-4" style={{ color: themes[selectedTheme].accent }} />
+                            )}
+                          </div>
+                          <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
                             <div
-                              className={`text-[14px] max-w-none leading-relaxed ${m.role === 'user' ? 'font-medium' : ''}`}
-                              style={{ color: m.role === 'user' ? '#ffffff' : '#334155' }}
+                              className={`p-4 rounded-2xl ${m.role === 'user' ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
+                              style={{
+                                backgroundColor: m.role === 'user' ? themes[selectedTheme].accent : '#ffffff',
+                                border: m.role === 'user' ? 'none' : '1px solid #f1f5f9',
+                                boxShadow: m.role === 'user' ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                              }}
                             >
-                              <ReactMarkdown>{content}</ReactMarkdown>
-                              {images.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-3">
-                                  {images.map((img, idx) => (
-                                    <img key={idx} src={img} alt="" className="max-w-full rounded-xl shadow-sm" style={{ border: '1px solid rgba(255,255,255,0.2)' }} />
-                                  ))}
-                                </div>
-                              )}
+                              <div
+                                className={`text-[14px] max-w-none leading-relaxed ${m.role === 'user' ? 'font-medium' : ''}`}
+                                style={{ color: m.role === 'user' ? '#ffffff' : '#334155' }}
+                              >
+                                <ReactMarkdown>{content}</ReactMarkdown>
+                                {images.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mt-3">
+                                    {images.map((img, idx) => (
+                                      <img key={idx} src={img} alt="" className="max-w-full rounded-xl shadow-sm" style={{ border: '1px solid rgba(255,255,255,0.2)' }} />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
+                      );
+                    }
+
+                    return (
+                      <div key={`export-${m.id}`}>
+                        <MbtiReply
+                          parsed={parsed!}
+                          messageId={`export-${m.id}`}
+                          theme={selectedTheme}
+                          viewMode={viewMode}
+                          isDarkBg={isDarkBg}
+                          accentColor={themes[selectedTheme].accent}
+                          forceShowAll={true}
+                          selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
+                        />
                       </div>
                     );
-                  }
-
-                  return (
-                    <div key={`export-${m.id}`}>
-                      <MbtiReply
-                        parsed={parsed!}
-                        messageId={`export-${m.id}`}
-                        theme={selectedTheme}
-                        viewMode={viewMode}
-                        isDarkBg={isDarkBg}
-                        accentColor={themes[selectedTheme].accent}
-                        forceShowAll={true}
-                        selectedGameRoles={messageSelectedRoles[String(m.id ?? '')] || selectedRoles}
-                      />
-                    </div>
-                  );
-                })}
-            </div>
-
-            {/* Footer */}
-            <div
-              className="mt-8 pt-6 flex justify-between items-center"
-              style={{ borderTop: `1px solid ${isDarkBg ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`, opacity: 0.4 }}
-            >
-              <div className="text-[9px] font-bold tracking-widest uppercase" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
-                Shared from Chat Blog App
+                  })}
               </div>
-              <div className="text-[9px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
-                {isMounted ? new Date().toLocaleTimeString() : ''}
+
+              {/* Footer */}
+              <div
+                className="mt-8 pt-6 flex justify-between items-center"
+                style={{ borderTop: `1px solid ${isDarkBg ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`, opacity: 0.4 }}
+              >
+                <div className="text-[9px] font-bold tracking-widest uppercase" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
+                  Shared from Chat Blog App
+                </div>
+                <div className="text-[9px] font-mono" style={{ color: isDarkBg ? '#ffffff' : '#000000' }}>
+                  {isMounted ? new Date().toLocaleTimeString() : ''}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div >
+        )}
+    </div>
   );
 }

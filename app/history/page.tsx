@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { UserStatus } from '@/components/UserStatus';
-import { ArrowLeft, Clock, History, ChevronDown, Users, Sparkles, BookOpen, Heart, Menu, X, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Clock, History, ChevronDown, Users, Sparkles, BookOpen, Heart, Menu, X, LayoutGrid, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export const dynamic = 'force-dynamic';
@@ -19,39 +19,60 @@ export default function HistoryPage() {
   const [isChatDropdownOpen, setIsChatDropdownOpen] = useState(false);
   const [isCommunityDropdownOpen, setIsCommunityDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const [filter, setFilter] = useState<'all' | 'mbti' | 'game'>('all');
+  const PAGE_SIZE = 20;
+
+  const load = async (pageNum: number, append: boolean = false) => {
+    if (pageNum === 0) setLoading(true);
+    setError(null);
+    try {
+      if (!supabaseClient) {
+        setError('Supabase 未配置：请设置 NEXT_PUBLIC_SUPABASE_URL 与 NEXT_PUBLIC_SUPABASE_ANON_KEY');
+        setLoading(false);
+        return;
+      }
+      const client = supabaseClient;
+      const { data: { user }, error: userErr } = await client.auth.getUser();
+      if (userErr) throw userErr;
+      if (!user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const { data, error } = await client
+        .from("conversations")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      if (append) {
+        setConversations(prev => [...prev, ...(data || [])]);
+      } else {
+        setConversations(data || []);
+      }
+
+      setHasMore((data || []).length === PAGE_SIZE);
+    } catch (e: any) {
+      setError(e?.message || "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (!supabaseClient) {
-          setError('Supabase 未配置：请设置 NEXT_PUBLIC_SUPABASE_URL 与 NEXT_PUBLIC_SUPABASE_ANON_KEY');
-          setLoading(false);
-          return;
-        }
-        const client = supabaseClient;
-        const { data: { user }, error: userErr } = await client.auth.getUser();
-        if (userErr) throw userErr;
-        if (!user) {
-          window.location.href = "/login";
-          return;
-        }
-        const { data, error } = await client
-          .from("conversations")
-          .select("id, title, view_mode, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        setConversations(data || []);
-      } catch (e: any) {
-        setError(e?.message || "加载失败");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    load(0);
   }, []);
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    load(nextPage, true);
+  };
 
   return (
     <main className="relative flex flex-col min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-sans">
@@ -210,36 +231,85 @@ export default function HistoryPage() {
         {loading && <div className="py-20 text-center text-[var(--text-tertiary)]">加载中...</div>}
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
 
-        <div className="grid gap-4">
-          {conversations.map((c) => (
-            <div
-              key={c.id}
-              className="group p-6 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-light)] hover:border-[var(--accent-main)]/30 transition-all flex items-center justify-between"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-[var(--bg-hover)] flex items-center justify-center">
-                  <History className="w-5 h-5 text-[var(--accent-main)]" />
-                </div>
-                <div>
-                  <div className="font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-main)] transition-colors">{c.title || "未命名会话"}</div>
-                  <div className="text-xs text-[var(--text-tertiary)] mt-1 flex items-center gap-2">
-                    <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] uppercase font-bold text-[10px]">{c.view_mode === 'game' ? '恋与深空' : 'MBTI'}</span>
-                    <span>{new Date(c.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>
+        <div className="space-y-6">
+          {['mbti', 'game'].map((mode) => {
+            // Find all conversations for this mode
+            const modeConvs = conversations.filter(c => c.view_mode === mode);
+            if (modeConvs.length === 0) return null;
+
+            // Get the latest one
+            const latest = modeConvs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+            return (
+              <div
+                key={mode}
+                className="group p-6 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-light)] hover:border-[var(--accent-main)]/30 transition-all flex items-center justify-between shadow-sm hover:shadow-md cursor-pointer relative overflow-hidden"
+              >
+                {/* Background Decoration */}
+                <div className={`absolute -right-10 -top-10 w-40 h-40 rounded-full opacity-5 pointer-events-none transition-transform group-hover:scale-110 ${mode === 'game' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+
+                <div className="flex items-center gap-6 min-w-0 z-10">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${mode === 'game' ? 'bg-indigo-50 text-indigo-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                    {mode === 'game' ? <Sparkles className="w-8 h-8" /> : <Users className="w-8 h-8" />}
+                  </div>
+
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xl font-black text-[var(--text-primary)] group-hover:text-[var(--accent-main)] transition-colors">
+                        {mode === 'game' ? '恋与深空 · 互动' : 'MBTI · 团队创作'}
+                      </h3>
+                      <span className="bg-[var(--bg-hover)] text-[var(--text-tertiary)] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                        {modeConvs.length} SESSIONS
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)] pt-1">
+                      <span className="font-bold font-mono text-[var(--accent-main)]">LATEST</span>
+                      <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
+                      <span>{new Date(latest.created_at).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</span>
+                      <span>{new Date(latest.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-3 z-10 pl-4">
+                  <Link
+                    href={`/history/${latest.id}`}
+                    className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--accent-main)] hover:text-white transition-all"
+                    title="继续最近的对话"
+                  >
+                    <History className="w-5 h-5 mb-0.5 ml-0.5" />
+                  </Link>
+                </div>
               </div>
-              <Link href={`/history/${c.id}`} className="px-5 py-2 rounded-full text-xs font-bold bg-[var(--accent-main)] text-white hover:opacity-90 transition-all">查看</Link>
-            </div>
-          ))}
-          {!loading && !error && conversations.length === 0 && (
-            <div className="py-32 text-center">
-              <div className="w-20 h-20 bg-[var(--bg-hover)] rounded-full flex items-center justify-center mx-auto mb-6">
-                <History className="w-10 h-10 opacity-10" />
-              </div>
-              <p className="text-[var(--text-tertiary)]">暂无历史记录</p>
-            </div>
-          )}
+            );
+          })}
         </div>
+
+        {!loading && hasMore && conversations.length > 0 && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={handleLoadMore}
+              className="px-8 py-3 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-light)] text-[var(--accent-main)] font-bold text-sm hover:border-[var(--accent-main)] transition-all shadow-sm"
+            >
+              加载更多记录
+            </button>
+          </div>
+        )}
+        {loading && conversations.length > 0 && (
+          <div className="mt-8 text-center text-[var(--text-tertiary)] flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>正在加载更多...</span>
+          </div>
+        )}
+        {!loading && !error && conversations.length === 0 && (
+          <div className="py-32 text-center">
+            <div className="w-20 h-20 bg-[var(--bg-hover)] rounded-full flex items-center justify-center mx-auto mb-6">
+              <History className="w-10 h-10 opacity-10" />
+            </div>
+            <p className="text-[var(--text-tertiary)]">暂无历史记录</p>
+          </div>
+        )}
       </div>
     </main>
   );
