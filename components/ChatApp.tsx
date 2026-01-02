@@ -1479,6 +1479,43 @@ export default function ChatApp() {
     }
   };
 
+  const compressImage = async (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1200;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas toBlob failed'));
+          }, 'image/jpeg', 0.7);
+        };
+      };
+      reader.onerror = reject;
+    });
+  };
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim() && attachedFiles.length === 0) return;
@@ -1498,14 +1535,25 @@ export default function ChatApp() {
       // Handle multimodal message if files are present
       if (filesSnapshot.length > 0) {
         attachments = await Promise.all(filesSnapshot.map(async (f) => {
+          // Compress image before sending to avoid "Request Entity Too Large"
+          let fileToProcess = f.file;
+          try {
+            if (f.file.type.startsWith('image/')) {
+              const compressedBlob = await compressImage(f.file);
+              fileToProcess = new File([compressedBlob], f.file.name, { type: 'image/jpeg' });
+            }
+          } catch (e) {
+            console.warn('Image compression failed, using original', e);
+          }
+
           const base64 = await new Promise<string>((resolve) => {
             const reader = new FileReader();
-            reader.readAsDataURL(f.file);
+            reader.readAsDataURL(fileToProcess);
             reader.onload = () => resolve(reader.result as string);
           });
           return {
             name: f.file.name,
-            contentType: f.file.type,
+            contentType: fileToProcess.type,
             url: base64,
           };
         }));
