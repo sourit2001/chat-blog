@@ -410,7 +410,7 @@ export default function ConversationDetailPage() {
         idx++;
       }
     }
-    return p;
+    return p.reverse();
   }, [messages, conversation?.view_mode]);
 
   return (

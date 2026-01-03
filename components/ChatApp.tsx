@@ -863,12 +863,11 @@ export default function ChatApp() {
     const idx = historyContexts.findIndex(m => m.id === msgId);
     if (idx === -1) return;
 
-    // We load everything from the start of our fetched window up to this message
-    const restored = historyContexts.slice(0, idx + 1).map((m: any) => ({
+    // We load everything from this message onwards to enable continuation from a specific round
+    const restored = historyContexts.slice(idx).map((m: any) => ({
       id: m.id,
       role: m.role as any,
       content: m.content,
-      parts: [{ type: 'text' as const, text: m.content }]
     }));
 
     setMessagesActive(restored);
