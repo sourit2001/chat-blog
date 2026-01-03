@@ -810,43 +810,76 @@ export default function ChatApp() {
     const fetchHistoryContexts = async () => {
       try {
         if (!supabaseClient) return;
-        const { data: userData, error: authError } = await supabaseClient.auth.getUser();
-        if (authError || !userData.user) return;
-        const user = userData.user;
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+        if (authError || !user) return;
 
-        // 1. Find the LATEST conversation for this mode
-        const { data: latestConv } = await supabaseClient
+        const { data: found, error: findError } = await supabaseClient
           .from('conversations')
-          .select('id, title, created_at')
+          .select('id')
           .eq('user_id', user.id)
           .eq('view_mode', viewMode)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
 
-        if (!latestConv) return;
+        if (findError) return;
 
-        // 2. Fetch the 3 most recent user messages from this conversation as entry points
-        const { data: userMsgs } = await supabaseClient
-          .from('messages')
-          .select('id, role, content, created_at')
-          .eq('conversation_id', latestConv.id)
-          .eq('role', 'user')
-          .order('created_at', { ascending: false })
-          .limit(3);
+        if (active && found && found.length > 0) {
+          const convId = found[0].id;
+          setConversationId(convId);
 
-        if (active && userMsgs && userMsgs.length > 0) {
-          const contextData = userMsgs.map((m, idx) => ({
-            convId: latestConv.id,
-            msgId: m.id,
-            content: m.content,
-            createdAt: m.created_at,
-            label: idx === 0 ? '最近录入' : (idx === 1 ? '前一次录入' : '更早录入')
-          }));
-          setHistoryContexts(contextData);
-          setConversationId(latestConv.id);
+          const { data: msgData, error: msgError } = await supabaseClient
+            .from('messages')
+            .select('id, role, content, created_at')
+            .eq('conversation_id', convId)
+            .order('created_at', { ascending: false })
+            .limit(20); // Load more history candidates so user has choices
+
+          if (msgError) return;
+
+          if (active && msgData) {
+            // Group into pairs (rounds)
+            let reversed = [...msgData].reverse();
+
+            // **Stream Cleanup**: Deduplicate identical consecutive messages
+            reversed = reversed.filter((msg, idx) => {
+              if (idx === 0) return true;
+              const prev = reversed[idx - 1];
+              if (msg.role === prev.role && msg.content === prev.content) return false;
+              return true;
+            });
+
+            // **Timeline Healer (Context Load)**
+            for (let i = reversed.length - 2; i >= 0; i--) {
+              const curr = reversed[i];
+              const next = reversed[i + 1];
+              if (curr.role === 'assistant' && next.role === 'user') {
+                // Safety: If this Assistant is already claimed by a preceding User, DO NOT swap.
+                const prev = i > 0 ? reversed[i - 1] : null;
+                if (prev && prev.role === 'user') continue;
+
+                const tCurr = new Date(curr.created_at);
+                const tNext = new Date(next.created_at);
+
+                const isSameSecond = Math.floor(tCurr.getTime() / 1000) === Math.floor(tNext.getTime() / 1000);
+                const isClose = Math.abs(tNext.getTime() - tCurr.getTime()) < 1500;
+
+                if (isSameSecond || isClose) {
+                  reversed[i] = next;
+                  reversed[i + 1] = curr;
+                }
+              }
+            }
+
+            setHistoryContexts(reversed);
+          }
+        } else {
+          if (active) {
+            setConversationId(null);
+            setHistoryContexts([]);
+          }
         }
       } catch (err) {
+        // Silently ignore network errors during background fetch
         console.warn('History fetch failed:', err);
       }
     };
@@ -857,33 +890,39 @@ export default function ChatApp() {
     return () => { active = false; };
   }, [viewMode, messages.length === 0]);
 
-  const loadContextUpTo = async (convId: string) => {
-    if (!supabaseClient) return;
-    try {
-      // Load last 3 rounds (6 messages) as requested
-      const { data: msgs, error } = await supabaseClient
-        .from('messages')
-        .select('id, role, content')
-        .eq('conversation_id', convId)
-        .order('created_at', { ascending: false })
-        .limit(6);
+  const loadContextUpTo = (msgId: string) => {
+    const idx = historyContexts.findIndex(m => m.id === msgId);
+    if (idx === -1) return;
 
-      if (error) throw error;
-
-      if (msgs) {
-        // Reverse to get chronological order for chat UI
-        const restored = [...msgs].reverse().map((m: any) => ({
-          id: m.id,
-          role: m.role as any,
-          content: m.content
-        }));
-
-        setConversationId(convId);
-        setMessagesActive(restored);
-        setHistoryContexts([]); // Clear picker after selection
+    // Smart Load: If user clicks a User message, and the NEXT one is Assistant, include it too.
+    // This ensures we always load a "Complete Round" (Trigger + Reply).
+    let endIdx = idx;
+    if (historyContexts[idx].role === 'user') {
+      const next = historyContexts[idx + 1];
+      if (next && next.role === 'assistant') {
+        endIdx = idx + 1;
       }
-    } catch (err) {
-      console.error('Failed to load conversation history:', err);
+    }
+
+    // We load everything from the start of our fetched window up to this message
+    const restored = historyContexts.slice(0, endIdx + 1).map((m: any) => ({
+      id: m.id,
+      role: m.role as any,
+      content: m.content,
+      parts: [{ type: 'text' as const, text: m.content }]
+    }));
+
+    setMessagesActive(restored);
+    setHistoryContexts([]); // Clear picker after selection
+
+    // **Fix for Duplication Bug**:
+    // precise sync of refs to prevent the "Auto-Save" effect from treating loaded history as new messages.
+    if (restored.length > 0) {
+      const lastMsg = restored[restored.length - 1];
+      lastStoredMessageIdRef.current = lastMsg.id;
+      if (lastMsg.role === 'assistant') {
+        lastAssistantDbIdRef.current = lastMsg.id;
+      }
     }
   };
 
@@ -1281,7 +1320,7 @@ export default function ChatApp() {
   const deleteMessage = async (messageId: string) => {
     try {
       // 1. Local state update
-      setMessagesActive((prev: any[]) => prev.filter((m: any) => m.id !== messageId));
+      setMessagesActive(prev => prev.filter(m => m.id !== messageId));
 
       // 2. Clear selected roles cache for this message if it's assistant
       setMessageSelectedRoles(prev => {
@@ -1829,7 +1868,7 @@ export default function ChatApp() {
                 selectedRolesQueueRef.current.push(Array.isArray(selectedRoles) ? [...selectedRoles] : []);
               }
               const contentForModel = withMetaBlocks(content);
-              sendMessageActive({ role: 'user', content: contentForModel } as any).catch((err: any) => console.error('Auto-send failed:', err));
+              sendMessageActive({ role: 'user', content: contentForModel } as any).catch(err => console.error('Auto-send failed:', err));
             }
           }, 2000);
         }
@@ -2258,34 +2297,69 @@ export default function ChatApp() {
                       <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">接续最近的对话进度</span>
                     </div>
                     <div className="grid grid-cols-1 gap-2.5">
-                      {historyContexts.map((ctx) => {
-                        return (
-                          <button
-                            key={ctx.msgId}
-                            onClick={() => loadContextUpTo(ctx.convId)}
-                            className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white/40 hover:bg-white/70 backdrop-blur-xl border border-white/40 hover:border-[var(--accent-main)]/30 shadow-sm transition-all text-left overflow-hidden active:scale-[0.98]"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-[9px] font-black text-[var(--accent-main)] uppercase tracking-tighter opacity-60">
-                                  {ctx.label}
-                                </span>
-                                <span className="text-[9px] text-slate-300 font-bold">•</span>
-                                <span className="text-[9px] text-slate-400 font-medium">
-                                  {new Date(ctx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
-                              <div className="text-[13px] font-bold text-slate-700 line-clamp-2 leading-snug">
-                                {stripMarkdownImages(ctx.content)}
-                              </div>
-                            </div>
+                      {(() => {
+                        const rounds = [];
+                        for (let i = 0; i < historyContexts.length; i++) {
+                          if (historyContexts[i].role === 'user') {
+                            rounds.push({
+                              user: historyContexts[i],
+                              assistant: historyContexts[i + 1]?.role === 'assistant' ? historyContexts[i + 1] : null,
+                              index: i
+                            });
+                          }
+                        }
+                        // Latest round first
+                        return rounds.reverse().slice(0, 3).map((round, idx) => {
+                          const m = round.user;
+                          const assistantMsg = round.assistant;
+                          const previewImages = getMessageImages({ content: m.content });
 
-                            <div className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <ArrowRight className="w-4 h-4 text-[var(--accent-main)]" />
-                            </div>
-                          </button>
-                        );
-                      })}
+                          return (
+                            <button
+                              key={m.id}
+                              onClick={() => loadContextUpTo(m.id)}
+                              className="group relative flex items-start gap-4 p-4 rounded-2xl bg-white/40 hover:bg-white/70 backdrop-blur-xl border border-white/40 hover:border-[var(--accent-main)]/30 shadow-sm transition-all text-left overflow-hidden active:scale-[0.98]"
+                            >
+                              <div className="flex-1 min-w-0 space-y-2">
+                                {/* Round Label */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] font-black text-[var(--accent-main)] uppercase tracking-tighter opacity-60">
+                                    {idx === 0 ? '最近一次对话' : `历史对话进度`}
+                                  </span>
+                                </div>
+
+                                {/* User Message */}
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">You</span>
+                                  <div className="text-[13px] font-bold text-slate-700 line-clamp-1 leading-snug">
+                                    {stripMarkdownImages(getMessageContent({ content: m.content, role: 'user' }))}
+                                  </div>
+                                </div>
+
+                                {/* Assistant Message */}
+                                {assistantMsg && (
+                                  <div className="flex flex-col gap-0.5 border-t border-slate-200/50 pt-1.5 mt-1">
+                                    <span className="text-[8px] font-bold text-[var(--accent-main)] uppercase tracking-widest">AI</span>
+                                    <div className="text-[12px] font-medium text-slate-500 line-clamp-2 leading-relaxed italic">
+                                      {stripMarkdownImages(getMessageContent({ content: assistantMsg.content, role: 'assistant' }))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {previewImages.length > 0 && (
+                                <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-white/50 bg-slate-100/50 mt-4">
+                                  <img src={previewImages[0]} alt="预览" className="w-full h-full object-cover" />
+                                </div>
+                              )}
+
+                              <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ArrowRight className="w-4 h-4 text-[var(--accent-main)]" />
+                              </div>
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
                     <button
                       onClick={() => setHistoryContexts([])}

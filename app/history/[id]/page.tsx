@@ -41,6 +41,7 @@ const stripPersonaBlock = (text: string) => (text || '').replace(PERSONA_BLOCK_R
 const stripRolesBlock = (text: string) => (text || '').replace(ROLES_BLOCK_REGEX, '').trim();
 
 const getMessageContent = (content: any) => {
+  if (!content) return '';
   let text = '';
   if (typeof content === 'string') text = content;
   else if (Array.isArray(content)) {
@@ -68,6 +69,7 @@ const MemoizedMessageContent = React.memo(({ content, isUser, fontSize }: { cont
 });
 
 const getMessageImages = (message: any) => {
+  if (!message) return [];
   let images: string[] = [];
   if (Array.isArray(message.content)) {
     images = message.content.filter((p: any) => p.type === 'image' || p.image).map((p: any) => p.image || p.data);
@@ -121,15 +123,6 @@ const MessagePairItem = React.memo(({
             <div className="flex-1 flex flex-col items-end min-w-0">
               <div className="p-2.5 sm:p-4 rounded-2xl rounded-tr-sm bg-[var(--accent-main)] text-white shadow-sm border border-[var(--accent-main)]/20 max-w-[94%] sm:max-w-none">
                 <MemoizedMessageContent content={userContent} isUser={true} fontSize={fontSize} />
-                {getMessageImages(pair.user).length > 0 && (
-                  <div className="flex flex-wrap justify-end gap-2.5 mt-3">
-                    {getMessageImages(pair.user).map((img, idx) => (
-                      <div key={idx} className="relative group/img overflow-hidden rounded-md border border-white/20 shadow-sm">
-                        <img src={img || undefined} alt="" loading="lazy" decoding="async" className="attachment-img transition-transform group-hover/img:scale-110 cursor-zoom-in" onClick={(e) => { e.stopPropagation(); window.open(img, '_blank'); }} />
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -158,15 +151,6 @@ const MessagePairItem = React.memo(({
                 <div className="flex-1 min-w-0 flex flex-col items-start">
                   <div className="p-2.5 sm:p-4 rounded-2xl rounded-tl-sm bg-white shadow-sm border border-slate-100 max-w-[94%] sm:max-w-none">
                     <MemoizedMessageContent content={assistantContent} isUser={false} fontSize={fontSize} />
-                    {getMessageImages(pair.assistant).length > 0 && (
-                      <div className="flex flex-wrap justify-start gap-2.5 mt-3">
-                        {getMessageImages(pair.assistant).map((img, idx) => (
-                          <div key={idx} className="relative group/img overflow-hidden rounded-md border border-slate-100 shadow-sm">
-                            <img src={img || undefined} alt="" loading="lazy" decoding="async" className="w-12 h-12 sm:w-14 sm:h-14 object-cover transition-transform group-hover/img:scale-110 cursor-zoom-in" onClick={(e) => { e.stopPropagation(); window.open(img, '_blank'); }} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                   {pair.assistant.audio_records && pair.assistant.audio_records.length > 0 && (
                     <div className="mt-2 sm:mt-4 px-1 space-y-2">
@@ -242,7 +226,7 @@ export default function ConversationDetailPage() {
 
   // 1. Unified Cache System (Persistent within session)
   // This satisfies the "don't reload what's already loaded" requirement.
-  const getCacheKey = (mode: string) => `history_cache_${mode}`;
+  const getCacheKey = (mode: string) => `history_cache_v8_${mode}`;
 
   useEffect(() => {
     const load = async () => {
@@ -281,22 +265,66 @@ export default function ConversationDetailPage() {
         } catch (e) { console.warn('Cache read failed:', e); }
 
         // **Optimization C: Background Intelligent Refresh**
-        const { data: related } = await client.from('conversations').select('id').eq('user_id', user.id).eq('view_mode', mode).order('updated_at', { ascending: false }).limit(20);
-        const ids = related?.map(r => r.id) || [id];
-
+        // **Classic Reliability Fix** (Reverting to Jan 1 Logic)
+        // 1. Fetch messages in Chronological Order (Oldest -> Newest)
+        // This ensures the "Conversation Stream" is intact and we can properly pair User -> AI.
         const { data: rawMsgs, error: msgsError } = await client
           .from("messages")
           .select(`id, role, content, created_at, audio_records (id, type, url, created_at)`)
-          .in("conversation_id", ids)
-          .order("created_at", { ascending: false })
-          .limit(20);
+          .eq("conversation_id", id)
+          .order("created_at", { ascending: false }) // DESCENDING: Get latest messages
+          .limit(20); // STRICT USER RULE: Limit to 20 to prevent freezing
 
         if (!msgsError && rawMsgs) {
-          setMessages(rawMsgs);
+          // Re-orient to Chronological (Oldest -> Newest) so the pairing logic works correctly
+          let chronologicalMsgs = [...rawMsgs].reverse();
+
+          // **Stream Cleanup**: Deduplicate identical consecutive messages (Backend Glitch Fix)
+          // Some backend errors cause double-insertion of the exact same AI reply.
+          chronologicalMsgs = chronologicalMsgs.filter((msg, idx) => {
+            if (idx === 0) return true;
+            const prev = chronologicalMsgs[idx - 1];
+            // Filter out if exact same content and role as previous
+            if (msg.role === prev.role && msg.content === prev.content) return false;
+            return true;
+          });
+
+          // **Timeline Healer**: Fix DB Race Conditions where AI Reply matches/precedes User Trigger
+          // Heuristic: If Assistant appears before User, it *might* be a glitch.
+          // BUT, we must distinguish "Glitch" (AI < User) from "Fast Reply" (User A -> AI A -> User B).
+          // Fix: Only swap if the Assistant is "orphaned" (i.e., NOT preceded by a User message).
+          for (let i = chronologicalMsgs.length - 2; i >= 0; i--) {
+            const curr = chronologicalMsgs[i];
+            const next = chronologicalMsgs[i + 1];
+
+            if (curr.role === 'assistant' && next.role === 'user') {
+              // Safety: If this Assistant is already claimed by a preceding User, DO NOT swap.
+              // This protects the "User A -> AI A -> User B" sequence.
+              const prev = i > 0 ? chronologicalMsgs[i - 1] : null;
+              if (prev && prev.role === 'user') continue;
+
+              const tCurr = new Date(curr.created_at);
+              const tNext = new Date(next.created_at);
+
+              const isSameSecond = Math.floor(tCurr.getTime() / 1000) === Math.floor(tNext.getTime() / 1000);
+              const isClose = Math.abs(tNext.getTime() - tCurr.getTime()) < 1500;
+
+              // USER INSIGHT: Messages in the same round usually share the same "Second" timestamp.
+              // So if they are in the same second (or very close), and order is inverted, IT IS THE SAME ROUND.
+              // We strictly swap to ensure correct User -> Assistant flow.
+              if (isSameSecond || isClose) {
+                chronologicalMsgs[i] = next;
+                chronologicalMsgs[i + 1] = curr;
+              }
+            }
+          }
+
+          setMessages(chronologicalMsgs);
           // **Smart Caching with Quota Safety**
           try {
-            sessionStorage.setItem(cacheKey, JSON.stringify({
-              messages: rawMsgs,
+            // Cache v6: Updated with Same-Second Healer
+            sessionStorage.setItem(getCacheKey(mode), JSON.stringify({
+              messages: chronologicalMsgs,
               timestamp: Date.now()
             }));
           } catch (e) {
@@ -385,32 +413,69 @@ export default function ConversationDetailPage() {
   // Expected Pair: { User (trigger), Assistant (reply) }
   // In Descending stream: Assistant (Reply) comes first (index i), User (Trigger) comes next (index i+1)
   // 2. Performance: Pre-parse and memoize pairs calculation to avoid main-thread lockup
+  // 2. Performance: Pre-parse and memoize pairs calculation
   const pairs = React.useMemo(() => {
-    const p: { user: any; assistant: any; parsedAssistant: any; userContent: string; assistantContent: string }[] = [];
+    if (messages.length === 0) return [];
+
+    // 1. Messages are ASC (Oldest -> Newest).
     const mode = conversation?.view_mode || 'mbti';
-    let idx = 0;
-    while (idx < messages.length) {
-      const curr = messages[idx];
-      if (curr.role === 'assistant') {
-        const next = (idx + 1 < messages.length && messages[idx + 1].role === 'user') ? messages[idx + 1] : null;
+    const p: { user: any; assistant: any; parsedAssistant: any; userContent: string; assistantContent: string; timestamp: number }[] = [];
 
-        const assistantContent = getMessageContent(curr.content);
-        const parsed = parseMbtiGroupReply(assistantContent, mode as any);
-        const userContent = next ? getMessageContent(next.content) : '';
+    let i = 0;
+    while (i < messages.length) {
+      const curr = messages[i];
 
-        if (next) {
-          p.push({ user: next, assistant: curr, parsedAssistant: parsed, userContent, assistantContent });
-          idx += 2;
-        } else {
-          p.push({ user: null, assistant: curr, parsedAssistant: parsed, userContent: '', assistantContent });
-          idx++;
+      if (curr.role === 'user') {
+        const user = curr;
+        const assistants: any[] = [];
+
+        // Look ahead for ALL consecutive AI replies that match the User's timestamp (Same Round)
+        let j = i + 1;
+        while (j < messages.length && messages[j].role === 'assistant') {
+          const tUser = new Date(user.created_at).getTime();
+          const tAsst = new Date(messages[j].created_at).getTime();
+
+          // STRICT TIMESTAMP CHECK: Only pair if within 1.5s (Supabase "Same Second" rule)
+          if (Math.abs(tAsst - tUser) <= 1500) {
+            assistants.push(messages[j]);
+            j++;
+          } else {
+            // Found an assistant message, but it's too far in time -> It belongs to a different round (or is orphaned)
+            break;
+          }
         }
+
+        const combinedContent = assistants.map(a => getMessageContent(a.content)).join('\n\n');
+        const userContent = getMessageContent(user.content);
+        const parsed = assistants.length > 0 ? parseMbtiGroupReply(combinedContent, mode as any) : null;
+
+        p.push({
+          user,
+          assistant: assistants[0] || null,
+          parsedAssistant: parsed,
+          userContent,
+          assistantContent: combinedContent,
+          timestamp: new Date(user.created_at).getTime()
+        });
+
+        i = j;
       } else {
-        p.push({ user: curr, assistant: null, parsedAssistant: null, userContent: getMessageContent(curr.content), assistantContent: '' });
-        idx++;
+        // Stray AI message (orphaned)
+        const content = getMessageContent(curr.content);
+        p.push({
+          user: null,
+          assistant: curr,
+          parsedAssistant: parseMbtiGroupReply(content, mode as any),
+          userContent: '',
+          assistantContent: content,
+          timestamp: new Date(curr.created_at).getTime()
+        });
+        i++;
       }
     }
-    return p;
+
+    // 2. Reverse for Display: Show the Newest Round at the top
+    return p.reverse();
   }, [messages, conversation?.view_mode]);
 
   return (
@@ -428,12 +493,12 @@ export default function ConversationDetailPage() {
           <Link href="/">
             <Logo className="w-7 h-7 sm:w-9 sm:h-9" showText={true} accentColor="#F59E0B" />
           </Link>
-        </div>
+        </div >
 
         <div className="flex items-center gap-2 sm:gap-4 font-bold text-slate-800">
           <UserStatus className="hidden sm:flex" />
         </div>
-      </nav>
+      </nav >
 
       <div className="flex-1 pt-20 sm:pt-32 px-3 sm:px-6 max-w-3xl mx-auto w-full pb-40 history-view-container relative">
         <style dangerouslySetInnerHTML={{
@@ -521,180 +586,184 @@ export default function ConversationDetailPage() {
       </div>
 
       {/* Blog Generation Toolbar */}
-      {!loading && !error && messages.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/80 backdrop-blur-xl border-t border-slate-200 z-40">
-          <div className="max-w-3xl mx-auto flex flex-col gap-3 sm:gap-4">
-            <AnimatePresence>
-              {blogDraft && isBlogDraftVisible && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                  className="p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xl flex items-center justify-between bg-white overflow-hidden"
+      {
+        !loading && !error && messages.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/80 backdrop-blur-xl border-t border-slate-200 z-40">
+            <div className="max-w-3xl mx-auto flex flex-col gap-3 sm:gap-4">
+              <AnimatePresence>
+                {blogDraft && isBlogDraftVisible && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    className="p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xl flex items-center justify-between bg-white overflow-hidden"
+                  >
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                      <div className="p-2 sm:p-3 rounded-xl bg-orange-100 text-orange-500 flex-shrink-0">
+                        <FileText className="w-4 sm:w-5 h-4 sm:h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Draft Ready</div>
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">{blogDraft.title}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('chat2blog_draft', JSON.stringify({ title: blogDraft.title, content: blogDraft.markdown }));
+                        router.push('/publish');
+                      }}
+                      className="flex-shrink-0 px-3 sm:px-4 py-2 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 active:scale-95"
+                    >
+                      <Globe className="w-3.5 h-3.5" /> 立即发布
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4">
+                <button
+                  onClick={() => setIsSelectionMode(!isSelectionMode)}
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold transition-all ${isSelectionMode ? 'bg-orange-50 text-orange-600 border border-orange-200 shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-transparent'}`}
                 >
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="p-2 sm:p-3 rounded-xl bg-orange-100 text-orange-500 flex-shrink-0">
-                      <FileText className="w-4 sm:w-5 h-4 sm:h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Draft Ready</div>
-                      <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">{blogDraft.title}</div>
-                    </div>
+                  {isSelectionMode ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                  <span className="text-xs sm:text-sm">{isSelectionMode ? '退出' : '选择'}</span>
+                </button>
+
+                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                  <div className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2.5 py-2 bg-slate-100 rounded-xl">
+                    <Palette className="w-3.5 h-3.5 text-slate-400" />
+                    <select
+                      value={blogStyle}
+                      onChange={(e) => setBlogStyle(e.target.value as any)}
+                      className="bg-transparent text-[11px] sm:text-xs font-black text-slate-600 outline-none border-none cursor-pointer appearance-none pr-3 uppercase tracking-tighter"
+                    >
+                      <option value="literary">文艺</option>
+                      <option value="logical">逻辑</option>
+                      <option value="record">记录</option>
+                    </select>
                   </div>
-                  <button
-                    onClick={() => {
-                      localStorage.setItem('chat2blog_draft', JSON.stringify({ title: blogDraft.title, content: blogDraft.markdown }));
-                      router.push('/publish');
-                    }}
-                    className="flex-shrink-0 px-3 sm:px-4 py-2 text-white text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 active:scale-95"
-                  >
-                    <Globe className="w-3.5 h-3.5" /> 立即发布
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4">
-              <button
-                onClick={() => setIsSelectionMode(!isSelectionMode)}
-                className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold transition-all ${isSelectionMode ? 'bg-orange-50 text-orange-600 border border-orange-200 shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-transparent'}`}
-              >
-                {isSelectionMode ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                <span className="text-xs sm:text-sm">{isSelectionMode ? '退出' : '选择'}</span>
-              </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={blogLoading}
+                      onClick={async () => {
+                        try {
+                          setBlogLoading(true);
+                          const targetMessages = (isSelectionMode && selectedMessageIds.size > 0)
+                            ? messages.filter(m => selectedMessageIds.has(m.id))
+                            : messages;
+                          const { cleanedMessages, imageMap } = prepareMessagesForBlog(targetMessages);
+                          const globalNick = localStorage.getItem('user_global_nickname');
+                          const authorName = globalNick || nickname || '笔者';
+                          const res = await fetch('/api/blog', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ messages: cleanedMessages, style: blogStyle, authorName }),
+                          });
+                          if (!res.ok) throw new Error('Failed to generate');
+                          const data = await res.json();
+                          setBlogDraft({ title: data.title, markdown: restoreBlogImages(data.markdown, imageMap) });
+                          setIsBlogDraftVisible(true);
+                        } catch (e: any) { alert(e.message); }
+                        finally { setBlogLoading(false); }
+                      }}
+                      className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-[11px] sm:text-xs text-white transition-all shadow-lg ${blogLoading ? 'bg-slate-300' : 'bg-orange-500 shadow-orange-100 hover:bg-orange-600 active:scale-95'}`}
+                    >
+                      {blogLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : '生成博客'}
+                    </button>
 
-              <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
-                <div className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2.5 py-2 bg-slate-100 rounded-xl">
-                  <Palette className="w-3.5 h-3.5 text-slate-400" />
-                  <select
-                    value={blogStyle}
-                    onChange={(e) => setBlogStyle(e.target.value as any)}
-                    className="bg-transparent text-[11px] sm:text-xs font-black text-slate-600 outline-none border-none cursor-pointer appearance-none pr-3 uppercase tracking-tighter"
-                  >
-                    <option value="literary">文艺</option>
-                    <option value="logical">逻辑</option>
-                    <option value="record">记录</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={blogLoading}
-                    onClick={async () => {
-                      try {
-                        setBlogLoading(true);
-                        const targetMessages = (isSelectionMode && selectedMessageIds.size > 0)
-                          ? messages.filter(m => selectedMessageIds.has(m.id))
-                          : messages;
-                        const { cleanedMessages, imageMap } = prepareMessagesForBlog(targetMessages);
-                        const globalNick = localStorage.getItem('user_global_nickname');
-                        const authorName = globalNick || nickname || '笔者';
-                        const res = await fetch('/api/blog', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ messages: cleanedMessages, style: blogStyle, authorName }),
-                        });
-                        if (!res.ok) throw new Error('Failed to generate');
-                        const data = await res.json();
-                        setBlogDraft({ title: data.title, markdown: restoreBlogImages(data.markdown, imageMap) });
-                        setIsBlogDraftVisible(true);
-                      } catch (e: any) { alert(e.message); }
-                      finally { setBlogLoading(false); }
-                    }}
-                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-[11px] sm:text-xs text-white transition-all shadow-lg ${blogLoading ? 'bg-slate-300' : 'bg-orange-500 shadow-orange-100 hover:bg-orange-600 active:scale-95'}`}
-                  >
-                    {blogLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : '生成博客'}
-                  </button>
-
-                  <button
-                    disabled={isExportingImage}
-                    onClick={handleDownloadImage}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-[11px] sm:text-xs text-white transition-all shadow-lg ${isExportingImage ? 'bg-slate-300' : 'bg-blue-500 shadow-blue-100 hover:bg-blue-600 active:scale-95'}`}
-                  >
-                    {isExportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-                    <span>{isExportingImage ? '' : '生成图片'}</span>
-                  </button>
+                    <button
+                      disabled={isExportingImage}
+                      onClick={handleDownloadImage}
+                      className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-[11px] sm:text-xs text-white transition-all shadow-lg ${isExportingImage ? 'bg-slate-300' : 'bg-blue-500 shadow-blue-100 hover:bg-blue-600 active:scale-95'}`}
+                    >
+                      {isExportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
+                      <span>{isExportingImage ? '' : '生成图片'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Hidden Capture Area - ONLY RENDER WHEN NEEDED */}
-      {isExportingImage && (
-        <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
-          <div ref={captureRef} className="p-10 w-[600px] flex flex-col gap-6 bg-white" style={{ backgroundColor: '#ffffff' }}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#ffffff', border: '1px solid #f1f5f9' }}>
-                  <Sparkles className="w-6 h-6" style={{ color: '#F59E0B' }} />
+      {
+        isExportingImage && (
+          <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
+            <div ref={captureRef} className="p-10 w-[600px] flex flex-col gap-6 bg-white" style={{ backgroundColor: '#ffffff' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#ffffff', border: '1px solid #f1f5f9' }}>
+                    <Sparkles className="w-6 h-6" style={{ color: '#F59E0B' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black leading-tight" style={{ color: '#0f172a' }}>智聊室 · Chat Blog</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94a3b8' }}>Creative Co-Creation</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-black leading-tight" style={{ color: '#0f172a' }}>智聊室 · Chat Blog</div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94a3b8' }}>Creative Co-Creation</div>
+                <div className="text-[10px] font-mono" style={{ color: '#94a3b8' }}>
+                  {isMounted ? new Date().toLocaleDateString() : ''}
                 </div>
               </div>
-              <div className="text-[10px] font-mono" style={{ color: '#94a3b8' }}>
-                {isMounted ? new Date().toLocaleDateString() : ''}
-              </div>
-            </div>
-            <div className="space-y-8">
-              {pairs.filter(p => (p.user && selectedMessageIds.has(p.user.id)) || (p.assistant && selectedMessageIds.has(p.assistant.id))).map((p, idx) => {
-                const viewMode = (conversation?.view_mode === 'game' ? 'game' : 'mbti') as any;
-                const parsed = p.parsedAssistant;
-                const hasRoles = parsed && parsed.roles.length > 0;
+              <div className="space-y-8">
+                {pairs.filter(p => (p.user && selectedMessageIds.has(p.user.id)) || (p.assistant && selectedMessageIds.has(p.assistant.id))).map((p, idx) => {
+                  const viewMode = (conversation?.view_mode === 'game' ? 'game' : 'mbti') as any;
+                  const parsed = p.parsedAssistant;
+                  const hasRoles = parsed && parsed.roles.length > 0;
 
-                return (
-                  <div key={`export-${idx}`} className="space-y-6">
-                    {p.user && selectedMessageIds.has(p.user.id) && (
-                      <div className="flex gap-3 flex-row-reverse">
-                        <div className="w-8 h-8 rounded-full flex-shrink-0 mt-1 flex items-center justify-center text-[8px] font-black text-white bg-orange-500 border border-orange-600 shadow-sm uppercase">YOU</div>
-                        <div className="p-4 rounded-2xl max-w-[85%] rounded-tr-sm bg-orange-500 text-white shadow-sm border border-orange-600">
-                          <div className="text-sm leading-relaxed prose prose-invert">
-                            <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="eager" /> : null }}>
-                              {p.userContent}
-                            </ReactMarkdown>
+                  return (
+                    <div key={`export-${idx}`} className="space-y-6">
+                      {p.user && selectedMessageIds.has(p.user.id) && (
+                        <div className="flex gap-3 flex-row-reverse">
+                          <div className="w-8 h-8 rounded-full flex-shrink-0 mt-1 flex items-center justify-center text-[8px] font-black text-white bg-orange-500 border border-orange-600 shadow-sm uppercase">YOU</div>
+                          <div className="p-4 rounded-2xl max-w-[85%] rounded-tr-sm bg-orange-500 text-white shadow-sm border border-orange-600">
+                            <div className="text-sm leading-relaxed prose prose-invert">
+                              <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="lazy" /> : null }}>
+                                {p.userContent}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                    {p.assistant && selectedMessageIds.has(p.assistant.id) && (
-                      <div className="space-y-4">
-                        {hasRoles ? (
-                          <div style={{ color: '#1e293b' }}>
-                            <MbtiReply parsed={parsed!} messageId={`export-asst-${p.assistant.id}`} viewMode={viewMode} forceShowAll={true} audioRecords={p.assistant.audio_records} />
-                          </div>
-                        ) : (
-                          <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full flex-shrink-0 mt-1 flex items-center justify-center bg-white border border-slate-200 text-orange-500 shadow-sm">
-                              <Sparkles className="w-4 h-4" />
+                      )}
+                      {p.assistant && selectedMessageIds.has(p.assistant.id) && (
+                        <div className="space-y-4">
+                          {hasRoles ? (
+                            <div style={{ color: '#1e293b' }}>
+                              <MbtiReply parsed={parsed!} messageId={`export-asst-${p.assistant.id}`} viewMode={viewMode} forceShowAll={true} audioRecords={p.assistant.audio_records} />
                             </div>
-                            <div className="p-4 rounded-2xl max-w-[85%] rounded-tl-sm bg-white text-slate-800 shadow-sm border border-slate-100">
-                              <div className="text-sm leading-relaxed prose">
-                                <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="eager" /> : null }}>
-                                  {p.assistantContent}
-                                </ReactMarkdown>
+                          ) : (
+                            <div className="flex gap-3">
+                              <div className="w-8 h-8 rounded-full flex-shrink-0 mt-1 flex items-center justify-center bg-white border border-slate-200 text-orange-500 shadow-sm">
+                                <Sparkles className="w-4 h-4" />
+                              </div>
+                              <div className="p-4 rounded-2xl max-w-[85%] rounded-tl-sm bg-white text-slate-800 shadow-sm border border-slate-100">
+                                <div className="text-sm leading-relaxed prose">
+                                  <ReactMarkdown components={{ img: ({ src }) => src ? <img src={src} loading="lazy" /> : null }}>
+                                    {p.assistantContent}
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-8 pt-6 flex justify-between items-center border-t border-slate-100" style={{ borderColor: '#f1f5f9' }}>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-black" style={{ backgroundColor: '#f97316', color: '#ffffff' }}>B</div>
-                <div className="text-[10px] font-bold" style={{ color: '#94a3b8' }}>Created via Chat2Blog</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div className="text-[9px] font-medium" style={{ color: '#cbd5e1' }}>#{id?.slice(0, 8)}</div>
+              <div className="mt-8 pt-6 flex justify-between items-center border-t border-slate-100" style={{ borderColor: '#f1f5f9' }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-black" style={{ backgroundColor: '#f97316', color: '#ffffff' }}>B</div>
+                  <div className="text-[10px] font-bold" style={{ color: '#94a3b8' }}>Created via Chat2Blog</div>
+                </div>
+                <div className="text-[9px] font-medium" style={{ color: '#cbd5e1' }}>#{id?.slice(0, 8)}</div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </main>
+        )
+      }
+    </main >
   );
 }
