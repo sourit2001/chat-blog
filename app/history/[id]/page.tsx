@@ -367,11 +367,20 @@ export default function ConversationDetailPage() {
         }
       });
 
-      const image = canvas.toDataURL('image/png', 1.0);
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `chat-export-${new Date().getTime()}.png`;
-      link.click();
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          alert('图片数据生成失败');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `chat-export-${new Date().getTime()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+      }, 'image/png');
     } catch (error) {
       console.error('Failed to generate image:', error);
       alert('生成图片失败，请重试');
@@ -621,8 +630,8 @@ export default function ConversationDetailPage() {
         </div>
       )}
 
-      {/* Hidden Capture Area - ONLY RENDER WHEN NEEDED */}
-      {isExportingImage && (
+      {/* Hidden Capture Area for Image Export - Persistent to ensure styles/images load correctly */}
+      {isMounted && (
         <div className="fixed -left-[9999px] top-0 pointer-events-none" aria-hidden="true">
           <div ref={captureRef} className="p-10 w-[600px] flex flex-col gap-6 bg-white" style={{ backgroundColor: '#ffffff' }}>
             <div className="flex items-center justify-between mb-2">
@@ -640,8 +649,12 @@ export default function ConversationDetailPage() {
               </div>
             </div>
             <div className="space-y-8">
-              {pairs.filter(p => (p.user && selectedMessageIds.has(p.user.id)) || (p.assistant && selectedMessageIds.has(p.assistant.id))).map((p, idx) => {
-                const viewMode = (conversation?.view_mode === 'game' ? 'game' : 'mbti') as any;
+              {pairs.filter(p => {
+                const userSelected = p.user && selectedMessageIds.has(p.user.id);
+                const asstSelected = p.assistant && selectedMessageIds.has(p.assistant.id);
+                return userSelected || asstSelected;
+              }).map((p, idx) => {
+                const mode = (conversation?.view_mode === 'game' ? 'game' : 'mbti') as any;
                 const parsed = p.parsedAssistant;
                 const hasRoles = parsed && parsed.roles.length > 0;
 
@@ -663,7 +676,7 @@ export default function ConversationDetailPage() {
                       <div className="space-y-4">
                         {hasRoles ? (
                           <div style={{ color: '#1e293b' }}>
-                            <MbtiReply parsed={parsed!} messageId={`export-asst-${p.assistant.id}`} viewMode={viewMode} forceShowAll={true} audioRecords={p.assistant.audio_records} />
+                            <MbtiReply parsed={parsed!} messageId={`export-asst-${p.assistant.id}`} viewMode={mode} forceShowAll={true} audioRecords={p.assistant.audio_records} />
                           </div>
                         ) : (
                           <div className="flex gap-3">
