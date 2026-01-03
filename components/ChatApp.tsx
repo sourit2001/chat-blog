@@ -853,17 +853,13 @@ export default function ChatApp() {
               const curr = reversed[i];
               const next = reversed[i + 1];
               if (curr.role === 'assistant' && next.role === 'user') {
-                // Safety: If this Assistant is already claimed by a preceding User, DO NOT swap.
-                const prev = i > 0 ? reversed[i - 1] : null;
-                if (prev && prev.role === 'user') continue;
-
                 const tCurr = new Date(curr.created_at);
                 const tNext = new Date(next.created_at);
 
-                const isSameSecond = Math.floor(tCurr.getTime() / 1000) === Math.floor(tNext.getTime() / 1000);
-                const isClose = Math.abs(tNext.getTime() - tCurr.getTime()) < 1500;
+                // STRICT HEALER: Only swap if truly ambiguous (Exact Same Second)
+                const sameSecond = tCurr.toISOString().slice(0, 19) === tNext.toISOString().slice(0, 19);
 
-                if (isSameSecond || isClose) {
+                if (sameSecond) {
                   reversed[i] = next;
                   reversed[i + 1] = curr;
                 }
@@ -896,16 +892,43 @@ export default function ChatApp() {
 
     // Smart Load: If user clicks a User message, and the NEXT one is Assistant, include it too.
     // This ensures we always load a "Complete Round" (Trigger + Reply).
+    let startIdx = idx;
     let endIdx = idx;
+
     if (historyContexts[idx].role === 'user') {
       const next = historyContexts[idx + 1];
       if (next && next.role === 'assistant') {
-        endIdx = idx + 1;
+        // STRICT CHECK: Only include this assistant if it actually belongs to this user.
+        const tUser = new Date(historyContexts[idx].created_at).getTime();
+        const tNext = new Date(next.created_at).getTime();
+
+        // Match logic: Same Second OR < 2s diff
+        const sameSecond = new Date(historyContexts[idx].created_at).toISOString().slice(0, 19) === new Date(next.created_at).toISOString().slice(0, 19);
+        const isClose = Math.abs(tNext - tUser) <= 2000;
+
+        if (sameSecond || isClose) {
+          endIdx = idx + 1;
+        }
+      }
+    } else if (historyContexts[idx].role === 'assistant') {
+      // If they clicked the assistant, try to find the preceding user to make a pair
+      const prev = historyContexts[idx - 1];
+      if (prev && prev.role === 'user') {
+        // STRICT CHECK BACKWARDS
+        const tAsst = new Date(historyContexts[idx].created_at).getTime();
+        const tPrev = new Date(prev.created_at).getTime();
+
+        const sameSecond = new Date(historyContexts[idx].created_at).toISOString().slice(0, 19) === new Date(prev.created_at).toISOString().slice(0, 19);
+        const isClose = Math.abs(tAsst - tPrev) <= 2000;
+
+        if (sameSecond || isClose) {
+          startIdx = idx - 1;
+        }
       }
     }
 
-    // We load everything from the start of our fetched window up to this message
-    const restored = historyContexts.slice(0, endIdx + 1).map((m: any) => ({
+    // STRICT SINGLE ROUND: Only load the identified pair [User, Assistant], ignoring all prior history.
+    const restored = historyContexts.slice(startIdx, endIdx + 1).map((m: any) => ({
       id: m.id,
       role: m.role as any,
       content: m.content,

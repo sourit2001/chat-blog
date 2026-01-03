@@ -226,7 +226,7 @@ export default function ConversationDetailPage() {
 
   // 1. Unified Cache System (Persistent within session)
   // This satisfies the "don't reload what's already loaded" requirement.
-  const getCacheKey = (mode: string) => `history_cache_v8_${mode}`;
+  const getCacheKey = (mode: string) => `history_cache_v16_${mode}`;
 
   useEffect(() => {
     const load = async () => {
@@ -289,30 +289,19 @@ export default function ConversationDetailPage() {
             return true;
           });
 
-          // **Timeline Healer**: Fix DB Race Conditions where AI Reply matches/precedes User Trigger
-          // Heuristic: If Assistant appears before User, it *might* be a glitch.
-          // BUT, we must distinguish "Glitch" (AI < User) from "Fast Reply" (User A -> AI A -> User B).
-          // Fix: Only swap if the Assistant is "orphaned" (i.e., NOT preceded by a User message).
+          // Healer: Fix DB Race Conditions where AI Reply (or fragments) matches/precedes User Trigger
           for (let i = chronologicalMsgs.length - 2; i >= 0; i--) {
             const curr = chronologicalMsgs[i];
             const next = chronologicalMsgs[i + 1];
 
             if (curr.role === 'assistant' && next.role === 'user') {
-              // Safety: If this Assistant is already claimed by a preceding User, DO NOT swap.
-              // This protects the "User A -> AI A -> User B" sequence.
-              const prev = i > 0 ? chronologicalMsgs[i - 1] : null;
-              if (prev && prev.role === 'user') continue;
-
               const tCurr = new Date(curr.created_at);
               const tNext = new Date(next.created_at);
 
-              const isSameSecond = Math.floor(tCurr.getTime() / 1000) === Math.floor(tNext.getTime() / 1000);
-              const isClose = Math.abs(tNext.getTime() - tCurr.getTime()) < 1500;
+              // STRICT HEALER: Only swap if truly ambiguous (Exact Same Second)
+              const sameSecond = tCurr.toISOString().slice(0, 19) === tNext.toISOString().slice(0, 19);
 
-              // USER INSIGHT: Messages in the same round usually share the same "Second" timestamp.
-              // So if they are in the same second (or very close), and order is inverted, IT IS THE SAME ROUND.
-              // We strictly swap to ensure correct User -> Assistant flow.
-              if (isSameSecond || isClose) {
+              if (sameSecond) {
                 chronologicalMsgs[i] = next;
                 chronologicalMsgs[i + 1] = curr;
               }
@@ -322,7 +311,7 @@ export default function ConversationDetailPage() {
           setMessages(chronologicalMsgs);
           // **Smart Caching with Quota Safety**
           try {
-            // Cache v6: Updated with Same-Second Healer
+            // Cache v12: Fixed Healer Anchor + Wide Pairing
             sessionStorage.setItem(getCacheKey(mode), JSON.stringify({
               messages: chronologicalMsgs,
               timestamp: Date.now()
@@ -432,15 +421,21 @@ export default function ConversationDetailPage() {
         // Look ahead for ALL consecutive AI replies that match the User's timestamp (Same Round)
         let j = i + 1;
         while (j < messages.length && messages[j].role === 'assistant') {
-          const tUser = new Date(user.created_at).getTime();
-          const tAsst = new Date(messages[j].created_at).getTime();
+          const tUser = new Date(user.created_at);
+          const tAsst = new Date(messages[j].created_at);
 
-          // STRICT TIMESTAMP CHECK: Only pair if within 1.5s (Supabase "Same Second" rule)
-          if (Math.abs(tAsst - tUser) <= 1500) {
+          // STRICT SAME ROUND CHECK:
+          // 1. Same Second (Ignore milliseconds) - User Instruction
+          // 2. Or very close (< 2s) to account for tiny database write delays.
+          // Note: We REMOVED the 10-minute window because it caused "Stolen Message" bugs (User B stealing AI A).
+          const sameSecond = tUser.toISOString().slice(0, 19) === tAsst.toISOString().slice(0, 19);
+          const strictWindow = Math.abs(tAsst.getTime() - tUser.getTime()) <= 2000;
+
+          if (sameSecond || strictWindow) {
             assistants.push(messages[j]);
             j++;
           } else {
-            // Found an assistant message, but it's too far in time -> It belongs to a different round (or is orphaned)
+            // Found an assistant message, but it timestamp mismatch -> Different round
             break;
           }
         }
