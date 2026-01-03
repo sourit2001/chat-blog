@@ -222,9 +222,9 @@ export default function HistoryPage() {
 
       <div className="pt-32 px-6 max-w-4xl mx-auto w-full pb-32">
         <div className="mb-12 flex items-end justify-between border-b border-[var(--border-light)] pb-8">
-          <div className="flex flex-col gap-1 sm:gap-2">
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tighter text-[var(--text-primary)]">我的记录</h1>
-            <p className="text-[10px] sm:text-sm text-[var(--text-tertiary)] font-medium">Archived Conversations — {conversations.length} Sessions</p>
+          <div>
+            <h1 className="text-5xl font-black tracking-tighter text-[var(--text-primary)]">我的记录</h1>
+            <p className="text-[var(--text-tertiary)] mt-2 font-medium">Archived Conversations — {conversations.length} Sessions</p>
           </div>
         </div>
 
@@ -243,31 +243,31 @@ export default function HistoryPage() {
             return (
               <div
                 key={mode}
-                className="group p-4 sm:p-6 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-light)] hover:border-[var(--accent-main)]/30 transition-all flex items-center justify-between shadow-sm hover:shadow-md cursor-pointer relative overflow-hidden"
+                className="group p-6 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-light)] hover:border-[var(--accent-main)]/30 transition-all flex items-center justify-between shadow-sm hover:shadow-md cursor-pointer relative overflow-hidden"
               >
                 {/* Background Decoration */}
                 <div className={`absolute -right-10 -top-10 w-40 h-40 rounded-full opacity-5 pointer-events-none transition-transform group-hover:scale-110 ${mode === 'game' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
 
-                <div className="flex items-center gap-4 sm:gap-6 min-w-0 z-10">
-                  <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${mode === 'game' ? 'bg-indigo-50 text-indigo-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                    {mode === 'game' ? <Sparkles className="w-6 h-6 sm:w-8 sm:h-8" /> : <Users className="w-6 h-6 sm:w-8 sm:h-8" />}
+                <div className="flex items-center gap-6 min-w-0 z-10">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${mode === 'game' ? 'bg-indigo-50 text-indigo-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                    {mode === 'game' ? <Sparkles className="w-8 h-8" /> : <Users className="w-8 h-8" />}
                   </div>
 
-                  <div className="min-w-0 space-y-0.5 sm:space-y-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                      <h3 className="text-base sm:text-xl font-black text-[var(--text-primary)] group-hover:text-[var(--accent-main)] transition-colors truncate">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xl font-black text-[var(--text-primary)] group-hover:text-[var(--accent-main)] transition-colors">
                         {mode === 'game' ? '恋与深空 · 互动' : 'MBTI · 团队创作'}
                       </h3>
-                      <span className="bg-[var(--bg-hover)] text-[var(--text-tertiary)] px-1.5 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase tracking-wider w-max">
+                      <span className="bg-[var(--bg-hover)] text-[var(--text-tertiary)] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
                         {modeConvs.length} SESSIONS
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-[var(--text-tertiary)] pt-0.5 sm:pt-1">
+                    <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)] pt-1">
                       <span className="font-bold font-mono text-[var(--accent-main)]">LATEST</span>
-                      <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
-                      <span className="whitespace-nowrap">{new Date(latest.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}</span>
-                      <span className="whitespace-nowrap">{new Date(latest.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
+                      <span>{new Date(latest.created_at).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</span>
+                      <span>{new Date(latest.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
                 </div>

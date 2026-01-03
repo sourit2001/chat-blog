@@ -810,45 +810,43 @@ export default function ChatApp() {
     const fetchHistoryContexts = async () => {
       try {
         if (!supabaseClient) return;
-        const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-        if (authError || !user) return;
+        const { data: userData, error: authError } = await supabaseClient.auth.getUser();
+        if (authError || !userData.user) return;
+        const user = userData.user;
 
-        const { data: found, error: findError } = await supabaseClient
+        // 1. Find the LATEST conversation for this mode
+        const { data: latestConv } = await supabaseClient
           .from('conversations')
-          .select('id')
+          .select('id, title, created_at')
           .eq('user_id', user.id)
           .eq('view_mode', viewMode)
           .order('created_at', { ascending: false })
-          .limit(1);
+          .limit(1)
+          .maybeSingle();
 
-        if (findError) return;
+        if (!latestConv) return;
 
-        if (active && found && found.length > 0) {
-          const convId = found[0].id;
-          setConversationId(convId);
+        // 2. Fetch the 3 most recent user messages from this conversation as entry points
+        const { data: userMsgs } = await supabaseClient
+          .from('messages')
+          .select('id, role, content, created_at')
+          .eq('conversation_id', latestConv.id)
+          .eq('role', 'user')
+          .order('created_at', { ascending: false })
+          .limit(3);
 
-          const { data: msgData, error: msgError } = await supabaseClient
-            .from('messages')
-            .select('id, role, content, created_at')
-            .eq('conversation_id', convId)
-            .order('created_at', { ascending: false })
-            .limit(6);
-
-          if (msgError) return;
-
-          if (active && msgData) {
-            // Group into pairs (rounds)
-            const reversed = [...msgData].reverse();
-            setHistoryContexts(reversed);
-          }
-        } else {
-          if (active) {
-            setConversationId(null);
-            setHistoryContexts([]);
-          }
+        if (active && userMsgs && userMsgs.length > 0) {
+          const contextData = userMsgs.map((m, idx) => ({
+            convId: latestConv.id,
+            msgId: m.id,
+            content: m.content,
+            createdAt: m.created_at,
+            label: idx === 0 ? '最近录入' : (idx === 1 ? '前一次录入' : '更早录入')
+          }));
+          setHistoryContexts(contextData);
+          setConversationId(latestConv.id);
         }
       } catch (err) {
-        // Silently ignore network errors during background fetch
         console.warn('History fetch failed:', err);
       }
     };
@@ -859,19 +857,34 @@ export default function ChatApp() {
     return () => { active = false; };
   }, [viewMode, messages.length === 0]);
 
-  const loadContextUpTo = (msgId: string) => {
-    const idx = historyContexts.findIndex(m => m.id === msgId);
-    if (idx === -1) return;
+  const loadContextUpTo = async (convId: string) => {
+    if (!supabaseClient) return;
+    try {
+      // Load last 3 rounds (6 messages) as requested
+      const { data: msgs, error } = await supabaseClient
+        .from('messages')
+        .select('id, role, content')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: false })
+        .limit(6);
 
-    // We load everything from this message onwards to enable continuation from a specific round
-    const restored = historyContexts.slice(idx).map((m: any) => ({
-      id: m.id,
-      role: m.role as any,
-      content: m.content,
-    }));
+      if (error) throw error;
 
-    setMessagesActive(restored);
-    setHistoryContexts([]); // Clear picker after selection
+      if (msgs) {
+        // Reverse to get chronological order for chat UI
+        const restored = [...msgs].reverse().map((m: any) => ({
+          id: m.id,
+          role: m.role as any,
+          content: m.content
+        }));
+
+        setConversationId(convId);
+        setMessagesActive(restored);
+        setHistoryContexts([]); // Clear picker after selection
+      }
+    } catch (err) {
+      console.error('Failed to load conversation history:', err);
+    }
   };
 
   const [isRecording, setIsRecording] = useState(false);
@@ -2245,30 +2258,27 @@ export default function ChatApp() {
                       <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">接续最近的对话进度</span>
                     </div>
                     <div className="grid grid-cols-1 gap-2.5">
-                      {historyContexts.filter(m => m.role === 'user').slice(-3).map((m, idx) => {
-                        const previewImages = getMessageImages({ content: m.content });
+                      {historyContexts.map((ctx) => {
                         return (
                           <button
-                            key={m.id}
-                            onClick={() => loadContextUpTo(m.id)}
+                            key={ctx.msgId}
+                            onClick={() => loadContextUpTo(ctx.convId)}
                             className="group relative flex items-center gap-4 p-4 rounded-2xl bg-white/40 hover:bg-white/70 backdrop-blur-xl border border-white/40 hover:border-[var(--accent-main)]/30 shadow-sm transition-all text-left overflow-hidden active:scale-[0.98]"
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1.5">
                                 <span className="text-[9px] font-black text-[var(--accent-main)] uppercase tracking-tighter opacity-60">
-                                  {idx === 2 ? '最后一次' : `前 ${2 - idx} 轮`}
+                                  {ctx.label}
+                                </span>
+                                <span className="text-[9px] text-slate-300 font-bold">•</span>
+                                <span className="text-[9px] text-slate-400 font-medium">
+                                  {new Date(ctx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
                               <div className="text-[13px] font-bold text-slate-700 line-clamp-2 leading-snug">
-                                {stripMarkdownImages(getMessageContent({ content: m.content, role: 'user' }))}
+                                {stripMarkdownImages(ctx.content)}
                               </div>
                             </div>
-
-                            {previewImages.length > 0 && (
-                              <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-white/50 bg-slate-100/50">
-                                <img src={previewImages[0]} alt="预览" className="w-full h-full object-cover" />
-                              </div>
-                            )}
 
                             <div className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
                               <ArrowRight className="w-4 h-4 text-[var(--accent-main)]" />
